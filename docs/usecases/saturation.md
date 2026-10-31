@@ -1,5 +1,11 @@
 # The bright limit: where saturation starts
 
+> **Current depth method:** newly built frame tables use empirical Photutils
+> ImageDepth blank-aperture noise. Statements below about the historical ~0.7 mag
+> independent-pixel bias apply to old tables; rebuild with `force=True`. The new
+> limits are background-noise thresholds, not source-recovery completeness.
+
+
 Every frame has a magnitude above which flux stops tracking brightness, because the peak
 pixel has hit the sensor ceiling. Measure it, or you will quietly put clipped stars into a
 zero-point fit or use one as a comparison star.

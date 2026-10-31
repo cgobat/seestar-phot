@@ -222,13 +222,11 @@ def limiting_mag(zeropoint, sigma_aper, nsigma=5.0):
     Needs no detections near the limit -- it is a noise-model extrapolation of the
     bright-star zero point.
 
-    **Optimistic in absolute terms by ~0.7 mag.** ``sigma_aper`` assumes independent
-    pixels, but demosaic interpolation and sub-pixel resampling correlate neighbours:
-    the measured aperture noise is ~2.0x the independent-pixel prediction on S50
-    on-board stacks. Relative use is fine (the offset is near-constant within one
-    processing chain, so exposure-time fits and per-unit rankings stand); absolute
-    depth claims are not, and the value must never be compared across processing
-    chains. See ``docs/frame-table.md``.
+    The pipeline supplies empirical blank-aperture noise, measured on the final
+    image with Photutils ImageDepth. Supplying sqrt(area) * pixel RMS instead
+    assumes independent pixels and can substantially overstate depth after
+    demosaicing/resampling. Neither choice measures detection completeness or
+    includes source Poisson noise at high significance levels.
     """
     return float(zeropoint - 2.5 * np.log10(nsigma * sigma_aper))
 

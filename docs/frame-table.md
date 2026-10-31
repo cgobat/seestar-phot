@@ -1,5 +1,11 @@
 # The frame table
 
+> **Current depth method:** newly built frame tables use empirical Photutils
+> ImageDepth blank-aperture noise. Statements below about the historical ~0.7 mag
+> independent-pixel bias apply to old tables; rebuild with `force=True`. The new
+> limits are background-noise thresholds, not source-recovery completeness.
+
+
 `quality.frame_quality(extraction, cal)` returns one row of per-frame metrics;
 `pipeline.build_frame_table` accumulates them into **`work_dir/frames.ecsv`**, one row per
 frame. It runs process-parallel — WCS and the catalogue are cached, so it is pure CPU — and

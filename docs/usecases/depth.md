@@ -1,5 +1,8 @@
 # How deep does it go?
 
+> The numerical examples below are historical independent-pixel results. Rerun them
+> to obtain empirical depths; they are not updated measurements of the sample data.
+
 Two questions, and they need different answers: *how deep is this frame*, and *how deep would
 N hours be*.
 
@@ -23,22 +26,22 @@ detections:
 
 $$V_\mathrm{lim} = \mathrm{ZP} - 2.5\log_{10}(n\,\sigma_\mathrm{aper})$$
 
-where `sigma_aper` is the aperture flux error — roughly √(aperture area) × sky RMS. That
-means it needs no detections near the limit at all; it extrapolates the *bright*-star
-calibration through the noise model.
+where `sigma_aper` is the measured dispersion of source-free aperture sums.
+This needs no detections near the limit; it combines a bright-star calibration
+with empirical noise measured at the same aperture radius.
 
-```{admonition} This number is optimistic by about 0.7 mag
-:class: warning
-`sigma_aper` assumes independent pixels. Demosaic interpolation and sub-pixel resampling
-**correlate** neighbours, and the measured aperture noise on S50 on-board stacks is **2.0×**
-the independent-pixel prediction.
+The pipeline now measures `sigma_aper` with Photutils `ImageDepth`: random
+source-masked apertures on the final background-subtracted image, using the science
+aperture radius. This captures spatial covariance present in the image. The
+historical independent-pixel estimate ran roughly 0.7 mag optimistic on the tested
+stacks. A blank-aperture limit is still not a recovery/completeness measurement,
+and the standard-system magnitude is quoted at the calibration's fiducial colour.
 
-Relative use is fine — the offset is near-constant within one processing chain, so
-exposure-time fits and per-unit rankings stand. Absolute depth claims are not, and the value
-must never be compared across processing chains. An earlier validation against the faint edge
-of the V–SNR locus looked reassuring but was circular: both sides used the same per-pixel
-error model, so it could not detect an error *in* that model.
-```
+Set `Project(depth_kwargs={"n_apertures": 1000, "n_iters": 10, "seed": 42}, ...)`
+to change sampling. Use `build_frame_table(force=True)` to rebuild old or cached
+rows. `depth_method`, `depth_n_apertures`, `depth_n_iters`, and `depth_seed` record
+how each new result was obtained. A field without usable blank sky fails explicitly.
+
 
 ## Longer exposures
 

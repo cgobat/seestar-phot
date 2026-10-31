@@ -251,15 +251,19 @@ def _frame_row(key, project):
     if wcs is None:
         return key, "no_wcs", None
     try:
+        mask = _frame_mask(project, frame, wcs)
         ext = photometry.extract_sources(
             frame, thresh=project.thresh, enclosed=project.enclosed_characterise,
-            mask=_frame_mask(project, frame, wcs), isolation=project.isolation,
+            mask=mask, isolation=project.isolation,
         )
         ext.match_gaia(_CATALOGUE, wcs=wcs, tol_arcsec=project.match_tol_arcsec)
         cal = calibration.fit_zeropoint(
             ext.sources, band="G", mag_range=project.fit_mag_range
         )
-        row = quality.frame_quality(ext, cal, provenance=project.provenance)
+        row = quality.frame_quality(
+            ext, cal, provenance=project.provenance, mask=mask,
+            depth_kwargs=project.depth_kwargs,
+        )
         row.update(astrometry.match_quality(ext.band("G"), project.match_tol_arcsec))
         row.update(quality.onboard_quality(frame))
         row["solver"] = project.solver

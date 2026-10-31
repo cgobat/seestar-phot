@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- Frame-table depth now uses Photutils ImageDepth blank apertures on each final
+  background-subtracted green image, capturing demosaic/resampling covariance.
+  Sampling settings and method are recorded; limits remain background-noise
+  thresholds at the fiducial colour, not detection-completeness claims.
+
 ### Added
 
 - **Passbands for the S30 Pro and S50 Pro**, fitted by the same method as the S50's:
