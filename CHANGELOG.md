@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Frame-table depth now uses Photutils ImageDepth blank apertures on each final
+  background-subtracted green image, capturing demosaic/resampling covariance.
+  Sampling settings and method are recorded; limits remain background-noise
+  thresholds at the fiducial colour, not detection-completeness claims.
+
 - Standard aperture photometry and growth curves now use Photutils with exact pixel
   overlap. Final errors use spatial background RMS maps; `effective_gain=` optionally
   includes source Poisson noise. Annulus subtraction propagates sky-mean uncertainty.

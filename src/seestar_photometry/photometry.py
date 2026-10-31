@@ -718,6 +718,62 @@ def forced_photometry(
     return out
 
 
+def aperture_depth(extraction, band="G", mask=None, n_sigma=5.0,
+                   n_apertures=500, n_iters=5, seed=0, bkgann=None):
+    """Empirical blank-aperture flux limit on the final processed image.
+
+    Photutils ``ImageDepth`` samples source-masked sky with the same radius as
+    the science photometry, retaining demosaic/resampling covariance. This is an
+    aperture-noise threshold, not injection/recovery completeness, and does not
+    include source Poisson noise. A standard-system magnitude limit additionally
+    requires a zeropoint and an assumed source colour.
+
+    Source footprints are detected at 2 sigma with Photutils segmentation and
+    padded by two FWHM beyond the aperture radius. Non-finite pixels and an
+    optional user mask are excluded. If ``bkgann`` is supplied, the same positions
+    are remeasured with local annulus subtraction; its full outer radius is kept
+    away from masks and image edges. No blank sky raises instead of silently
+    substituting an independent-pixel estimate.
+
+    Returns a dict containing ``flux_limit``, ``sigma_aper``, ``n_apertures``,
+    ``n_iters``, and ``seed``. The fixed seed makes pipeline reruns reproducible.
+    """
+    from astropy.stats import SigmaClip
+    from photutils.segmentation import detect_sources
+    from photutils.utils import ImageDepth
+
+    i = BANDS.index(band)
+    data = extraction.frame.data[i] - extraction.background[i]
+    invalid = ~np.isfinite(data)
+    if mask is not None:
+        invalid |= _as_mask(mask, data.shape)
+    segmentation = detect_sources(data, 2 * extraction.rms[i], 5, mask=invalid)
+    source_mask = invalid.copy()
+    if segmentation is not None:
+        source_mask |= segmentation.data > 0
+    radius = float(extraction.aperture[i])
+    padding = 2 * float(extraction.fwhm[i])
+    sample_radius = radius if bkgann is None else float(bkgann[1])
+    estimator = ImageDepth(
+        sample_radius, n_sigma=n_sigma, n_apertures=n_apertures,
+        n_iters=n_iters, seed=seed, mask_pad=padding, progress_bar=False,
+    )
+    flux_limit, _ = estimator(data, source_mask)
+    if bkgann is not None:
+        limits = []
+        for apertures in estimator.apertures:
+            x, y = np.asarray(apertures.positions).T
+            flux, _, _ = _aperture_flux(data, x, y, radius, 0.0, bkgann=bkgann)
+            limits.append(n_sigma * np.std(SigmaClip(sigma=3, maxiters=10)(
+                flux, masked=False)))
+        flux_limit = float(np.mean(limits))
+    return {
+        "flux_limit": float(flux_limit), "sigma_aper": float(flux_limit / n_sigma),
+        "n_apertures": int(np.min(estimator.n_apertures_used)),
+        "n_iters": n_iters, "seed": seed,
+    }
+
+
 def fit_background(extraction, band="G"):
     """Fit a 2nd-order 2D polynomial to a band's SEP background map.
 

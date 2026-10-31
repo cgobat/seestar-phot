@@ -1,5 +1,11 @@
 # seestar-photometry
 
+> **Current depth method:** newly built frame tables use empirical Photutils
+> ImageDepth blank-aperture noise. Statements below about the historical ~0.7 mag
+> independent-pixel bias apply to old tables; rebuild with `force=True`. The new
+> limits are background-noise thresholds, not source-recovery completeness.
+
+
 Time-domain photometry from ZWO Seestar smart-telescope frames, calibrated onto Gaia DR3
 synthetic Johnson V.
 

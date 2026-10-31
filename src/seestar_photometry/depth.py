@@ -17,10 +17,11 @@ Caveats, both of which matter before quoting a number:
   Extrapolating to 1-16 h assumes no systematic floor (flat-field residuals,
   imperfect alignment). This module applies the *theoretical* scaling; it does not
   co-add frames, so long-exposure values should be validated by actually stacking.
-* ``v_lim_5sigma`` is itself a noise-model extrapolation of the bright-star zero
-  point (see :func:`calibration.limiting_mag`), and empirically runs optimistic by
-  roughly 0.7-1.1 mag against what is actually recoverable in a stack. Treat it as
-  a relative quality metric, not an absolute detection promise.
+* ``v_lim_5sigma`` uses empirical source-masked blank-aperture noise on the
+  processed image. It is a background-noise threshold at the calibration's
+  fiducial colour, not a source-injection completeness limit. Crowding, source
+  Poisson noise, and selection criteria can still change actual recoverability.
+
 """
 
 import numpy as np

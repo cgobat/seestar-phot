@@ -17,7 +17,8 @@ Reading the important columns:
     to spot frames that are *much* worse than their peers, not as an absolute test.
 ``v_lim_5sigma`` / ``v_lim_100sigma``
     Faint and bright-ish ends of the usable range, extrapolated from the zero point
-    and the aperture noise. Optimistic in absolute terms -- see
+    and empirical blank-aperture noise at the fiducial colour. These are
+    background-noise thresholds, not completeness measurements -- see
     :func:`calibration.limiting_mag`.
 ``v_sat``
     Empirical saturation limit: brighter than this the flux stops tracking V.
@@ -35,7 +36,7 @@ import numpy as np
 from . import calibration
 
 
-def frame_quality(extraction, cal, provenance=None):
+def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None):
     """One row of per-frame quality metrics, as a flat dict.
 
     Parameters
@@ -44,6 +45,10 @@ def frame_quality(extraction, cal, provenance=None):
         A cross-matched extraction (``match_gaia`` already applied).
     cal : Calibration
         The green-band zero-point fit for the same frame.
+    mask : np.ndarray, optional
+        Exclude known emission, invalid coverage, or other regions from blank sky.
+    depth_kwargs : dict, optional
+        Sampling settings passed to :func:`photometry.aperture_depth`.
     provenance : callable, optional
         ``provenance(frame) -> dict`` of extra columns to merge in -- dataset name,
         stacking manifest fields, binning, whatever a particular project tracks.
@@ -58,9 +63,8 @@ def frame_quality(extraction, cal, provenance=None):
 
     vcol = next((c for c in ("v_jkc_mag", "v_mag") if c in g.colnames), None)
     n_matched = int((~np.ma.getmaskarray(g[vcol])).sum()) if vcol else 0
-    # Aperture noise is the (constant) green aperture flux error; the median is
-    # robust to the few apertures truncated at the frame edge.
-    sigma_aper = float(np.median(np.asarray(g["fluxerr"], dtype=float)))
+    empirical = photometry.aperture_depth(extraction, mask=mask, **(depth_kwargs or {}))
+    sigma_aper = empirical["sigma_aper"]
 
     bg = photometry.fit_background(extraction, band="G")
     pixscale = astrometry.pixel_scale(frame)
@@ -111,6 +115,10 @@ def frame_quality(extraction, cal, provenance=None):
         "v_lim_100sigma": calibration.limiting_mag(cal.zeropoint, sigma_aper, nsigma=100.0),
         "v_sat": calibration.saturation_mag(g),
         "sigma_aper": sigma_aper,
+        "depth_method": "blank_apertures",
+        "depth_n_apertures": empirical["n_apertures"],
+        "depth_n_iters": empirical["n_iters"],
+        "depth_seed": empirical["seed"],
         # PSF
         "fwhm_R": float(extraction.fwhm[0]),
         "fwhm_G": float(extraction.fwhm[1]),

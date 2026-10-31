@@ -126,6 +126,10 @@ class Project:
         round, and -- being large -- isolated, so it passes every curve-of-growth cut and
         can end up sizing the aperture for the whole frame. See
         :data:`photometry.COG_MAX_SIZE_RATIO`.
+    depth_kwargs : dict, optional
+        Blank-aperture depth sampling settings: ``n_apertures``, ``n_iters``,
+        ``seed`` (defaults 500, 5, 0). Existing frame-table rows must be rebuilt
+        with ``build_frame_table(force=True)`` after changing these settings.
     isolation : float, optional
         Nearest-neighbour distance (px) a curve-of-growth star must clear. ``None`` keeps
         the :mod:`photometry` default of ``2 * COG_RADII.max()`` (40 px); lower it in a
@@ -151,6 +155,7 @@ class Project:
     provenance: object = field(default=None, repr=False)
     mask: object = field(default=None, repr=False)
     isolation: float = None
+    depth_kwargs: dict = field(default_factory=dict)
 
     def __post_init__(self):
         self.work_dir = Path(self.work_dir)
