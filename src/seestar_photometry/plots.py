@@ -132,7 +132,7 @@ def reference_vs_instrumental(cal, ax=None):
     ax.plot(x, x + cal.zeropoint, color=_style.MODEL, lw=1.4,
             label=f"ZP = {cal.zeropoint:.3f}")
     ax.set_xlabel("instrumental magnitude  ($-2.5\\log_{10}$ flux)")
-    ax.set_ylabel("reference V (mag)")
+    ax.set_ylabel(f"{cal.reference_system} (mag)")
     ax.set_title(f"Zero-point relation, {cal.band} band")
     _style.mag_axis(ax, "y")
     _style.legend(ax, loc="lower left")
@@ -169,7 +169,7 @@ def zeropoint_vs_colour(cal, ax=None):
             color=_style.MODEL, lw=1.4, label=f"k = {cal.colour_term:+.3f}")
     _style.reference_line(ax, cal.colour0, axis="x", label="colour0")
     ax.set_xlabel(f"colour  {cal.colour_label}")
-    ax.set_ylabel("$V - m_{inst}$  (mag)")
+    ax.set_ylabel(f"{cal.reference_system} - instrumental (mag)")
     ax.set_title("Colour term")
     _style.legend(ax, loc="lower left")
     _style.annotate(
@@ -197,7 +197,7 @@ def residual_vs(cal, against="v", ax=None):
     keep = fit["keep"]
     resid = fit["residual"] - fit["model"]
     if against == "v":
-        x, label = fit["v"], "reference V (mag)"
+        x, label = fit["v"], f"{cal.reference_system} (mag)"
     elif against == "snr":
         x, label = fit["snr"], "SNR"
     elif against == "radius":
@@ -705,7 +705,7 @@ def lightcurve(lc, mag_col="dmag", ax=None, title=None):
     _style.reference_line(ax, 0.0 if mag_col == "dmag" else float(np.nanmedian(y)),
                           axis="y")
     ax.set_xlabel(f"BJD (TDB){suffix}")
-    ax.set_ylabel("$\\Delta$V (mag)" if mag_col == "dmag" else "V (mag)")
+    ax.set_ylabel("$\\Delta$mag" if mag_col == "dmag" else "magnitude")
     ax.set_title(title or f"Differential light curve, {lc.meta.get('band', '?')} band")
     _style.mag_axis(ax, "y")
     scatter = float(np.nanstd(y))
@@ -936,7 +936,7 @@ def phase_fold(lc, period, t0=None, n_bins=25, ax=None):
                 color=_style.CATEGORICAL[1], lw=1.6,
                 label="binned mean" if offset == 0 else None)
     ax.set_xlabel("phase")
-    ax.set_ylabel("$\\Delta$V (mag)")
+    ax.set_ylabel("$\\Delta$mag")
     ax.set_title(f"Phase folded on {period:.5f} d")
     ax.set_xlim(0, 2)
     _style.mag_axis(ax, "y")

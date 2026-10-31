@@ -220,3 +220,41 @@ def test_onboard_quality_lifted_from_crowdsky_header(mef_frame, cube_frame):
     # CrowdSky reports FWHM in arcsec, hence the key name.
     assert lifted["onboard_fwhm_G_arcsec"] == pytest.approx(6.6)
     assert quality.onboard_quality(cube_frame) == {}
+
+
+def test_explicit_reference_band_recovers_known_red_transformation(extraction):
+    sources = extraction.sources.copy()
+    red = np.asarray(sources["band"]) == "R"
+    colour = np.asarray(sources["b_jkc_mag"]) - np.asarray(sources["r_jkc_mag"])
+    inst = -2.5 * np.log10(np.asarray(sources["flux"]))
+    sources["r_ref"] = inst + 23.0 + 0.17 * colour
+    cal = calibration.fit_zeropoint(
+        sources, band="R", reference_mag="r_ref", mag_range=None,
+        colour_columns=("b_jkc_mag", "r_jkc_mag"), reference_system="SDSS r (AB)",
+    )
+    assert cal.colour_term == pytest.approx(0.17, abs=1e-10)
+    assert cal.reference_mag == "r_ref"
+    assert cal.reference_system == "SDSS r (AB)"
+    recovered = calibration.apply_calibration(inst[red], cal, colour[red])
+    np.testing.assert_allclose(recovered, sources["r_ref"][red])
+    with pytest.raises(KeyError):
+        calibration.fit_zeropoint(sources, band="R", reference_mag="missing_r")
+
+
+def test_custom_colour_and_nonfinite_calibrators(extraction):
+    sources = extraction.sources.copy()
+    sources["gr"] = np.asarray(sources["bp_rp"])
+    sources["r_ref"] = np.asarray(sources["v_jkc_mag"])
+    red = np.flatnonzero(np.asarray(sources["band"]) == "R")
+    sources["r_ref"][red[0]] = np.nan
+    sources["gr"][red[1]] = np.inf
+    cal = calibration.fit_zeropoint(
+        sources, band="R", reference_mag="r_ref", colour_columns="gr"
+    )
+    assert np.isfinite(cal.zeropoint)
+    assert cal.colour_label == "gr"
+    constant = calibration.fit_zeropoint(
+        sources, band="R", reference_mag="r_ref", colour_columns=()
+    )
+    assert constant.colour_term == 0
+    assert constant.reference_system == "r_ref"

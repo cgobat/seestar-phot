@@ -44,7 +44,7 @@ Each module imports only from layers above it.
 
 **`BANDS = ("R", "G", "B")` is the canonical axis-0 order.** Every per-band array
 (`Extraction.rms`, `.aperture`, `.fwhm`) is shape `(3,)` in that order. **Green is index 1
-and is the science band** (≈ Johnson V through IRCUT).
+and is the default science band** (≈ Johnson V through IRCUT).
 
 **Image shape comes from the data, never a header.** The CrowdSky layout has an *empty*
 primary HDU with no `NAXIS1`/`NAXIS2`, so any code reading shape from a header is broken on

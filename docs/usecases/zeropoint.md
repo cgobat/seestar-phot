@@ -104,3 +104,31 @@ deep    = ...   # 1460 s -> ZP 23.656
 should not be.
 
 More detail in [astrometry-and-gaia](../astrometry-and-gaia.md).
+
+## Other channels and reference systems
+
+`calibration.fit_zeropoint` accepts `reference_mag`, `colour_columns`, and
+`reference_system` for every camera channel. For example:
+
+```python
+cal_r = calibration.fit_zeropoint(
+    ext.sources, band="R", reference_mag="r_jkc_mag",
+    colour_columns=("b_jkc_mag", "r_jkc_mag"),
+    reference_system="Cousins R (Vega)",
+)
+```
+
+`Project.band_calibrations` maps channels to `CalibrationSpec` objects and applies
+those same choices in both pipeline stages. The default remains G-to-V. Configure
+Sloan r with a reference catalogue column in that system; missing requested columns
+raise rather than falling back to V. Custom catalogue columns survive cross-matching
+and the stars table. `colour_columns=()` disables the colour term; a single string
+selects a precomputed catalogue colour. A pair selects their difference, including
+synthetic Seestar G-R where available. This release does not fit noisy measured
+instrumental colours or propagate their shared measurement errors.
+
+The calibrated measurement table carries each band's reference system and zeropoint.
+`m_transformed` contains the colour correction before the zeropoint; use it as
+`inst_col` when forming a colour-corrected ensemble light curve, along with the
+matching `band` and `cat_mag_col`. Calibration columns on unconfigured bands are
+NaN. Standard-system depth is conditional on the fit's fiducial colour.

@@ -30,13 +30,12 @@ docs with `-W`. There is no linter or formatter configured — match the surroun
 - **`BANDS = ("R", "G", "B")` is the canonical axis-0 order.** Every frame is a
   `(3, ny, nx)` float32 array in that order. Every per-band array (`Extraction.rms`,
   `.aperture`, `.fwhm`) is shape `(3,)` in that order. **Green is index 1 and is the
-  science band** (≈ Johnson V through the Seestar's IRCUT filter). Only green is
-  calibrated onto reference V; R and B stay instrumental, which is all the colour
-  diagnostics need. The offline catalogue *also* carries synthetic magnitudes in the
-  instrument's own bands (`r_s50_mag` / `g_s50_mag` / `b_s50_mag`), which would let all
-  three planes be calibrated and remove the colour term rather than fit it — but
-  **nothing reads them yet**, and `v_jkc_mag` is still the reference everywhere. They
-  reach only G < 15, so any consumer has to keep the V path as the fallback.
+  default science band** (approximately Johnson V through IRCUT). Camera channels
+  and reference bands are distinct: `CalibrationSpec` selects each channel's
+  reference column, catalogue colour, and system label. G-to-V is the default,
+  while R/B or instrument-system calibrations are opt-in. Missing requested
+  reference columns must raise rather than silently fall back to V.
+
 
 - **Image shape comes from the data, never the header.** `frame.shape` is the accessor.
   The CrowdSky multi-extension layout has an *empty* primary HDU with no `NAXIS1`/`NAXIS2`,

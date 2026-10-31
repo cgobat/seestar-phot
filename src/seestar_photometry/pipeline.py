@@ -23,6 +23,7 @@ procedure -- which matters when a stage takes hours over thousands of frames.
 import os
 import time
 import traceback
+from dataclasses import asdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
@@ -257,14 +258,26 @@ def _frame_row(key, project):
             mask=mask, isolation=project.isolation,
         )
         ext.match_gaia(_CATALOGUE, wcs=wcs, tol_arcsec=project.match_tol_arcsec)
-        cal = calibration.fit_zeropoint(
-            ext.sources, band="G", mag_range=project.fit_mag_range
-        )
-        row = quality.frame_quality(
-            ext, cal, provenance=project.provenance, mask=mask,
-            depth_kwargs=project.depth_kwargs,
-        )
-        row.update(astrometry.match_quality(ext.band("G"), project.match_tol_arcsec))
+        fits = {
+            band: calibration.fit_zeropoint(
+                ext.sources, band=band, mag_range=project.fit_mag_range, **asdict(spec)
+            ) for band, spec in project.band_calibrations.items()
+        }
+        primary = "G" if "G" in fits else next(iter(fits))
+        rows = {
+            band: quality.frame_quality(ext, cal, mask=mask, depth_kwargs=project.depth_kwargs)
+            for band, cal in fits.items()
+        }
+        row = rows[primary].copy()
+        for band, metrics in rows.items():
+            for name in ("reference_mag", "reference_system", "colour_label", "zeropoint",
+                         "zeropoint_err", "colour_term", "colour_term_err", "colour0",
+                         "rms", "chi2_red", "n_cal", "mag_lim_5sigma", "mag_lim_100sigma",
+                         "mag_sat", "sigma_aper"):
+                row[f"{name}_{band}"] = metrics[name]
+        if project.provenance is not None:
+            row.update(project.provenance(frame))
+        row.update(astrometry.match_quality(ext.band(primary), project.match_tol_arcsec))
         row.update(quality.onboard_quality(frame))
         row["solver"] = project.solver
         row["enclosed"] = project.enclosed_characterise
@@ -377,13 +390,15 @@ def _measure_sources(key, project):
         # is carried straight through rather than re-matched. `forced` is three
         # per-band blocks, each in `in_frame` row order.
         n_band = len(photometry.BANDS)
-        for col in ("v_jkc_mag", "b_jkc_mag", "r_jkc_mag", "phot_variable_flag"):
-            if col in in_frame.colnames:
+        for col in in_frame.colnames:
+            if col not in forced.colnames:
                 forced[col] = np.ma.concatenate([in_frame[col]] * n_band)
 
-        cal = calibration.fit_zeropoint(
-            forced, band="G", mag_range=project.fit_mag_range
-        )
+        fits = {
+            band: calibration.fit_zeropoint(
+                forced, band=band, mag_range=project.fit_mag_range, **asdict(spec)
+            ) for band, spec in project.band_calibrations.items()
+        }
 
         target = SkyCoord(project.target.ra * u.deg, project.target.dec * u.deg)
         meta = frames.frame_metadata(frame)
@@ -391,15 +406,25 @@ def _measure_sources(key, project):
 
         m_inst = photometry.instrumental_mag(forced["flux"])
         mag_err = photometry.mag_error(forced["snr"])
-        # Only the green band is calibrated onto reference V; R and B keep their
-        # instrumental magnitudes, which is all the colour diagnostics need.
-        colour = (np.asarray(forced["b_jkc_mag"], dtype=float)
-                  - np.asarray(forced["r_jkc_mag"], dtype=float)) \
-            if "b_jkc_mag" in forced.colnames else None
-        is_green = np.asarray(forced["band"]) == "G"
-        mag = np.where(
-            is_green, calibration.apply_calibration(m_inst, cal, colour), np.nan
-        )
+        mag = np.full(len(forced), np.nan)
+        transformed = np.full(len(forced), np.nan)
+        zeropoint = np.full(len(forced), np.nan)
+        zeropoint_err = np.full(len(forced), np.nan)
+        zp_rms = np.full(len(forced), np.nan)
+        reference_mag = np.full(len(forced), "", dtype="U128")
+        reference_system = np.full(len(forced), "", dtype="U128")
+        for band, cal in fits.items():
+            select = np.asarray(forced["band"]) == band
+            colour, colour_mask, _ = calibration._pick_colour(forced[select], cal.colour_columns)
+            if colour_mask is not None:
+                colour = np.where(colour_mask, np.nan, colour)
+            mag[select] = calibration.apply_calibration(m_inst[select], cal, colour)
+            transformed[select] = mag[select] - cal.zeropoint
+            zeropoint[select] = cal.zeropoint
+            zeropoint_err[select] = cal.zeropoint_err
+            zp_rms[select] = cal.rms
+            reference_mag[select] = cal.reference_mag
+            reference_system[select] = cal.reference_system
 
         n = len(forced)
         t = Table()
@@ -416,13 +441,17 @@ def _measure_sources(key, project):
         t["fluxerr"] = forced["fluxerr"]
         t["snr"] = forced["snr"]
         t["m_inst"] = m_inst
+        t["m_transformed"] = transformed
         t["mag"] = mag
         t["mag_err"] = mag_err
         t["flag"] = forced["flag"]
         t["on_chip"] = forced["on_chip"]
         t["max_pix_value"] = forced["max_pix_value"]
-        t["zeropoint"] = np.full(n, cal.zeropoint)
-        t["zp_rms"] = np.full(n, cal.rms)
+        t["zeropoint"] = zeropoint
+        t["zeropoint_err"] = zeropoint_err
+        t["zp_rms"] = zp_rms
+        t["reference_mag"] = reference_mag
+        t["reference_system"] = reference_system
         return key, "ok", t
     except Exception as exc:
         return key, "failed", f"{exc!r}\n{traceback.format_exc()}"
@@ -477,7 +506,6 @@ def build_measurements(project, workers=None, limit=None, diagnostics=False):
     target = stars[np.asarray(stars["is_target"])]
     if len(target):
         print(f"[measure] target source_id={int(target['source_id'][0])} "
-              f"V={float(target['v_jkc_mag'][0]):.2f} "
               f"sep={float(target['sep_target_arcmin'][0]):.2f}'", flush=True)
 
     if diagnostics:

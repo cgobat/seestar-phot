@@ -70,7 +70,7 @@ Beyond Gaia's own columns it carries **synthetic magnitudes in the Seestar's own
 bands** (`r_s50_mag`, `g_s50_mag`, `b_s50_mag`), integrated from Gaia XP spectra through
 the unit's fitted passbands, for the 34.2M sources brighter than G = 15. Calibrating a
 Bayer plane against its own band removes the zero point's colour term rather than fitting
-it. Nothing in the calibration path reads them yet — see
+it. The default calibration remains G-to-V; `CalibrationSpec` can select these columns — see
 [`docs/background-info/s50-photometric-system.md`](docs/background-info/s50-photometric-system.md)
 for where the S50's bands sit against JKC and SDSS, and what they do to a real stack.
 
@@ -155,3 +155,52 @@ uv run pytest
 Fully offline: synthetic frames with injected Gaussian PSFs of known flux, in both FITS
 layouts, so the tests assert *recovery* of a known zero point, colour term, aperture and
 period rather than merely that the code runs.
+
+## Calibrating another camera channel
+
+G-to-V remains the default. Configure R-to-Rc using the cached Gaia synthetic R
+column (the system label must describe the catalogue you actually use):
+
+```python
+from seestar_photometry import CalibrationSpec
+
+proj.band_calibrations = {
+    "G": CalibrationSpec(),
+    "R": CalibrationSpec(
+        reference_mag="r_jkc_mag",
+        colour_columns=("b_jkc_mag", "r_jkc_mag"),
+        reference_system="Cousins R (Vega)",
+    ),
+}
+frames = pipeline.build_frame_table(proj, force=True)
+stars, measurements = pipeline.build_measurements(proj)
+```
+
+For Sloan r, supply matching standard-system reference columns in the project's
+cached catalogue and choose, for example, `reference_mag="r_ref"`,
+`colour_columns=("g_ref", "r_ref")`, `reference_system="SDSS r (AB)"`.
+This does not fetch missing Sloan photometry or equate SDSS with Pan-STARRS.
+You may also select `g_s50_mag - r_s50_mag` as a catalogue-synthesized Seestar
+G-R predictor where those columns exist. This is not a noisy measured-colour fit.
+
+Each measurement records `reference_mag`, `reference_system`, and its own band's
+zeropoint. Unconfigured channels retain instrumental flux/magnitude and NaN
+calibrated values, including NaN calibration metadata. The `m_transformed` column
+contains the colour-corrected instrumental magnitude before the zeropoint.
+For an ensemble R light curve, pass `band="R"`, `cat_mag_col="r_jkc_mag"`, and
+`inst_col="m_transformed"` to `lightcurves.differential_lightcurve`; select
+comparisons with the corresponding `mag_col` too. The formal `mag_err` remains
+measurement noise only: catalogue and transformation-parameter errors are not
+silently folded into it.
+
+Frame tables expose generic `mag_lim_5sigma`, `mag_lim_100sigma`, and `mag_sat`
+for the primary calibration (G when configured, otherwise the first mapping entry),
+plus band-suffixed calibration/depth columns such as `zeropoint_R`,
+`reference_system_R`, and `mag_lim_5sigma_R`. V aliases are NaN for a non-V
+primary reference. Existing dataset-level V diagnostic/depth-model functions
+remain V-specific; do not use them to interpret an R-only table.
+
+Camera channels are not standard filters. Colour fits require suitable reference
+stars spanning the relevant range and must be validated on held-out stars. Stellar
+transformations need not apply to nonstellar or emission-line spectra. AB/Vega
+labels describe the supplied catalogue; no automatic conversion is performed.

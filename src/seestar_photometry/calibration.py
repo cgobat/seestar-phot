@@ -1,4 +1,4 @@
-"""Photometric calibration onto the Gaia synthetic V system.
+"""Photometric calibration onto a configured catalogue system (default Gaia V).
 
 Once a frame's sources carry their cross-matched catalogue columns (see
 ``Extraction.match_gaia``), calibrating the green band onto Gaia DR3 synthetic
@@ -38,6 +38,23 @@ _BORTLE_SQM = [(21.75, 1), (21.5, 2), (21.25, 3), (20.5, 4),
                (19.5, 5), (18.75, 6), (18.0, 7), (17.0, 8)]
 
 
+@dataclass(frozen=True)
+class CalibrationSpec:
+    """Reference system for one camera channel in ``Project.band_calibrations``.
+
+    ``reference_mag=None`` preserves the legacy V-column cascade. Otherwise the
+    named catalogue column is required, with no fallback to a different system.
+    ``colour_columns`` is a single catalogue column, a pair to subtract, ``()``
+    to disable the colour fit, or ``None`` for the legacy B-R/BP-RP cascade.
+    ``reference_system`` labels the catalogue scale, including AB/Vega where
+    known; it performs no magnitude-system conversion.
+    """
+
+    reference_mag: str = None
+    colour_columns: tuple | str = None
+    reference_system: str = None
+
+
 @dataclass
 class Calibration:
     """Result of :func:`fit_zeropoint`.
@@ -66,6 +83,9 @@ class Calibration:
     #: Sigma-clipped residuals and the arrays they were fit from, for the
     #: diagnostic figures. Not part of the numeric result.
     fit: dict = None
+    reference_mag: str = "v_jkc_mag"
+    reference_system: str = "Johnson V"
+    colour_columns: tuple | str = None
 
 
 def _pick_v_column(t):
@@ -76,7 +96,7 @@ def _pick_v_column(t):
     raise KeyError("no reference V column (need 'v_jkc_mag' or 'v_mag')")
 
 
-def _pick_colour(t):
+def _pick_colour(t, columns=None):
     """``(colour, mask, label)`` from the best available colour source.
 
     Cascade: synthetic Johnson ``b_jkc_mag - r_jkc_mag`` (best -- it is the same
@@ -85,6 +105,18 @@ def _pick_colour(t):
     moves the zero point; this exists so the fit keeps working across catalogue
     schemas rather than to squeeze out accuracy.
     """
+    if columns is not None:
+        if not columns:
+            return None, None, "none"
+        names = (columns,) if isinstance(columns, str) else tuple(columns)
+        if len(names) not in (1, 2):
+            raise ValueError("colour_columns must name one column or a pair")
+        values = [np.asarray(np.ma.filled(t[name], np.nan), float) for name in names]
+        mask = np.ma.getmaskarray(t[names[0]])
+        if len(names) == 1:
+            return values[0], mask, names[0]
+        mask = mask | np.ma.getmaskarray(t[names[1]])
+        return values[0] - values[1], mask, " - ".join(names)
     cols = t.colnames
     if "b_jkc_mag" in cols and "r_jkc_mag" in cols:
         colour = np.asarray(t["b_jkc_mag"], float) - np.asarray(t["r_jkc_mag"], float)
@@ -97,9 +129,10 @@ def _pick_colour(t):
 
 def fit_zeropoint(
     sources, band="G", mag_range=FIT_MAG_RANGE, clip=3.0, iters=2,
-    exclude_variable=True,
+    exclude_variable=True, reference_mag=None, colour_columns=None,
+    reference_system=None,
 ):
-    """Fit the zero point (and, where available, a colour term) against reference V.
+    """Fit a zeropoint and optional colour term against a catalogue reference.
 
     The reference V is Gaia synthetic JKC V (``v_jkc_mag``) when present, else a
     plain ``v_mag``. The colour cascades as in :func:`_pick_colour`; with no colour
@@ -109,12 +142,21 @@ def fit_zeropoint(
     Parameters
     ----------
     sources : astropy.table.Table
-        Table augmented by ``Extraction.match_gaia`` -- needs ``flux``, ``snr``, a V
+        Cross-matched table with ``flux``, ``snr``, the reference magnitude
         column, and optionally colour columns and ``phot_variable_flag``.
     band : str
-        Band to calibrate. ``"G"`` is the science band.
+        Camera channel to calibrate (R, G, or B); G-to-V is the default.
+    reference_mag : str, optional
+        Catalogue magnitude column in the desired system. Required explicitly
+        for an R-to-Rc or R-to-Sloan-r calibration; missing columns raise.
+    colour_columns : str or tuple, optional
+        One catalogue colour column, a pair of magnitude columns to subtract,
+        or ``()`` for a constant zeropoint. ``None`` keeps the legacy cascade.
+        These are catalogue predictors, not noisy instrumental colours.
+    reference_system : str, optional
+        Human-readable scale label, e.g. "Cousins R (Vega)" or "SDSS r (AB)".
     mag_range : tuple of float or None
-        Reference-V window the fit is restricted to. Zero point and colour term are
+        Reference-magnitude window the fit is restricted to. Zero point and colour term are
         fit over the same range so they stay mutually consistent. ``None`` uses all
         matched stars.
     clip, iters : float, int
@@ -126,11 +168,19 @@ def fit_zeropoint(
     -------
     Calibration
     """
-    vcol = _pick_v_column(sources)
+    vcol = reference_mag if reference_mag is not None else _pick_v_column(sources)
     t = sources[np.asarray(sources["band"]) == band]
-    colour, colour_mask, colour_label = _pick_colour(t)
+    colour, colour_mask, colour_label = _pick_colour(t, colour_columns)
 
-    finite = ~np.ma.getmaskarray(t[vcol])
+    finite = ~np.ma.getmaskarray(t[vcol]) & np.isfinite(np.asarray(t[vcol], float))
+    finite &= np.isfinite(np.asarray(t["flux"], float))
+    finite &= np.isfinite(np.asarray(t["snr"], float)) & (np.asarray(t["snr"]) > 0)
+    if "flag" in t.colnames:
+        finite &= np.asarray(t["flag"]) == 0
+    if "on_chip" in t.colnames:
+        finite &= np.asarray(t["on_chip"], bool)
+    if colour is not None:
+        finite &= np.isfinite(colour)
     if colour_mask is not None:
         finite &= ~colour_mask
     if exclude_variable and "phot_variable_flag" in t.colnames:
@@ -150,24 +200,40 @@ def fit_zeropoint(
     sigma = 1.0857 / np.asarray(t["snr"], dtype=float)  # photon error on the residual
     residual = v - m_inst  # = ZP + k*colour
 
+    npar = 2 if colour is not None else 1
+    if len(t) <= npar:
+        raise ValueError(f"too few usable {band}-band calibrators for {vcol}")
+    if colour is not None and np.ptp(colour) <= 1e-12:
+        raise ValueError("calibrators have no colour range; disable the colour fit")
+
     if colour is not None:
         colour0 = float(np.median(colour))
         x = colour - colour0
         keep = np.ones(len(x), dtype=bool)
-        for _ in range(iters + 1):
+        for iteration in range(iters + 1):
             (k, zp), cov = np.polyfit(x[keep], residual[keep], 1, cov=True)
             model = zp + k * x
             scatter = np.std((residual - model)[keep])
-            keep = np.abs(residual - model) < clip * scatter
+            if iteration == iters or scatter <= 1e-12:
+                break
+            clipped = np.abs(residual - model) < clip * scatter
+            if clipped.sum() <= npar:
+                raise ValueError("too few calibrators after clipping")
+            keep = clipped
         k_err = float(np.sqrt(cov[0, 0]))
         zp_err = float(np.sqrt(cov[1, 1]))
     else:
         colour0, k, k_err = float("nan"), 0.0, 0.0
         keep = np.ones(len(residual), dtype=bool)
-        for _ in range(iters + 1):
+        for iteration in range(iters + 1):
             zp = float(np.mean(residual[keep]))
             scatter = np.std(residual[keep] - zp)
-            keep = np.abs(residual - zp) < clip * scatter
+            if iteration == iters or scatter <= 1e-12:
+                break
+            clipped = np.abs(residual - zp) < clip * scatter
+            if clipped.sum() <= npar:
+                raise ValueError("too few calibrators after clipping")
+            keep = clipped
         model = np.full(len(residual), zp)
         zp_err = float(np.std(residual[keep]) / np.sqrt(max(int(keep.sum()), 1)))
 
@@ -187,6 +253,9 @@ def fit_zeropoint(
         chi2_red=chi2_red,
         mag_range=tuple(mag_range) if mag_range is not None else None,
         colour_label=colour_label,
+        reference_mag=vcol,
+        reference_system=reference_system or ("Johnson V" if reference_mag is None else vcol),
+        colour_columns=colour_columns,
         fit={
             "v": v, "colour": colour, "m_inst": m_inst, "residual": residual,
             "model": model, "keep": keep, "snr": np.asarray(t["snr"], dtype=float),
@@ -196,7 +265,7 @@ def fit_zeropoint(
 
 
 def apply_calibration(m_inst, cal, colour=None):
-    """Put an instrumental magnitude on the reference V scale.
+    """Put an instrumental magnitude on the configured reference scale.
 
     ``V = m_inst + ZP + k * (colour - colour0)``. With no colour for the source the
     colour term is dropped, which is correct at the field's median colour and
@@ -231,7 +300,7 @@ def limiting_mag(zeropoint, sigma_aper, nsigma=5.0):
     return float(zeropoint - 2.5 * np.log10(nsigma * sigma_aper))
 
 
-def saturation_mag(sources, sat_level=SAT_LEVEL):
+def saturation_mag(sources, sat_level=SAT_LEVEL, reference_mag=None):
     """Bright-end (saturation) limit in reference V from a band's matched sources.
 
     As stars brighten their peak pixel hits the sensor ceiling and the measured flux
@@ -243,7 +312,8 @@ def saturation_mag(sources, sat_level=SAT_LEVEL):
     ``sources`` must be single-band and cross-matched (needs ``max_pix_value`` and a
     V column).
     """
-    vcol = next((c for c in ("v_jkc_mag", "v_mag") if c in sources.colnames), None)
+    vcol = reference_mag or next((c for c in ("v_jkc_mag", "v_mag")
+                                  if c in sources.colnames), None)
     if "max_pix_value" not in sources.colnames or vcol is None:
         return float("nan")
     peak = np.asarray(sources["max_pix_value"], dtype=float)

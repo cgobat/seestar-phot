@@ -44,6 +44,7 @@ from . import (
     report,
     stacking,
 )
+from .calibration import CalibrationSpec
 from .frames import BANDS, LocalTree, SeestarFrame, load_frame
 from .project import Project, Target
 
@@ -63,5 +64,5 @@ __all__ = [
     "examples", "frames", "gaiadb", "kron", "lightcurves", "photometry", "pipeline",
     "plots", "project", "quality", "report", "stacking",
     # the names you actually reach for
-    "BANDS", "LocalTree", "Project", "SeestarFrame", "Target", "load_frame",
+    "BANDS", "CalibrationSpec", "LocalTree", "Project", "SeestarFrame", "Target", "load_frame",
 ]

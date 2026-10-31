@@ -27,7 +27,7 @@ detail — this page is the map.
 Three conventions hold everywhere:
 
 - `BANDS = ("R", "G", "B")` is the canonical axis-0 order, and **green is index 1 and is the
-  science band**. Every per-band array is shape `(3,)` in that order.
+  default science band**. Every per-band array is shape `(3,)` in that order.
 - **Image shape comes from the data, never a header.** The CrowdSky layout has an empty
   primary HDU with no `NAXIS1`/`NAXIS2`.
 - `SeestarFrame` and `Project` are thin data containers. Analysis lives in module-level
