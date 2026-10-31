@@ -4,6 +4,12 @@
 
 ### Changed
 
+- `CalibrationSpec` and `Project.band_calibrations` configure each camera channel's
+  catalogue reference, colour predictor, and system label. G-to-V remains the default;
+  R-to-Rc, R-to-r, and instrument-system calibrations are explicit opt-ins. Measurement
+  rows now carry their own band's calibration and reference system. Generic and
+  band-suffixed depth columns avoid labelling non-V results as V.
+
 - Frame-table depth now uses Photutils ImageDepth blank apertures on each final
   background-subtracted green image, capturing demosaic/resampling covariance.
   Sampling settings and method are recorded; limits remain background-noise

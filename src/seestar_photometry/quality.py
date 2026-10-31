@@ -44,7 +44,7 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
     extraction : Extraction
         A cross-matched extraction (``match_gaia`` already applied).
     cal : Calibration
-        The green-band zero-point fit for the same frame.
+        The selected channel's zero-point fit for the same frame.
     mask : np.ndarray, optional
         Exclude known emission, invalid coverage, or other regions from blank sky.
     depth_kwargs : dict, optional
@@ -59,14 +59,16 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
 
     frame = extraction.frame
     meta = frames.frame_metadata(frame)
-    g = extraction.band("G")
+    g = extraction.band(cal.band)
 
-    vcol = next((c for c in ("v_jkc_mag", "v_mag") if c in g.colnames), None)
+    vcol = cal.reference_mag
     n_matched = int((~np.ma.getmaskarray(g[vcol])).sum()) if vcol else 0
-    empirical = photometry.aperture_depth(extraction, mask=mask, **(depth_kwargs or {}))
+    empirical = photometry.aperture_depth(
+        extraction, band=cal.band, mask=mask, **(depth_kwargs or {})
+    )
     sigma_aper = empirical["sigma_aper"]
 
-    bg = photometry.fit_background(extraction, band="G")
+    bg = photometry.fit_background(extraction, band=cal.band)
     pixscale = astrometry.pixel_scale(frame)
     sky_sb = calibration.sky_surface_brightness(
         bg["pedestal"], cal.zeropoint, pixscale, frame.header.get("BIAS", 0.0)
@@ -97,10 +99,14 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
         "pixscale": pixscale,
         # counts
         "n_sources": len(extraction.sources),
-        "n_green": len(g),
+        "n_green": len(extraction.band("G")),
         "n_matched": n_matched,
         "n_cal": cal.n_stars,
         # calibration
+        "science_band": cal.band,
+        "reference_mag": cal.reference_mag,
+        "reference_system": cal.reference_system,
+        "colour_label": cal.colour_label,
         "zeropoint": cal.zeropoint,
         "zeropoint_err": cal.zeropoint_err,
         "colour_term": cal.colour_term,
@@ -111,9 +117,9 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
         "fit_mag_lo": cal.mag_range[0] if cal.mag_range else np.nan,
         "fit_mag_hi": cal.mag_range[1] if cal.mag_range else np.nan,
         # depth / dynamic range
-        "v_lim_5sigma": calibration.limiting_mag(cal.zeropoint, sigma_aper),
-        "v_lim_100sigma": calibration.limiting_mag(cal.zeropoint, sigma_aper, nsigma=100.0),
-        "v_sat": calibration.saturation_mag(g),
+        "mag_lim_5sigma": calibration.limiting_mag(cal.zeropoint, sigma_aper),
+        "mag_lim_100sigma": calibration.limiting_mag(cal.zeropoint, sigma_aper, nsigma=100.0),
+        "mag_sat": calibration.saturation_mag(g, reference_mag=cal.reference_mag),
         "sigma_aper": sigma_aper,
         "depth_method": "blank_apertures",
         "depth_n_apertures": empirical["n_apertures"],
@@ -136,6 +142,13 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
         "sky_sb": sky_sb,
         "bortle": calibration.effective_bortle(sky_sb),
     }
+    # Keep V aliases for legacy consumers without mislabelling another system.
+    is_v = cal.reference_mag in ("v_jkc_mag", "v_mag")
+    if not is_v:
+        row["bortle"] = np.nan  # V-based Bortle thresholds do not apply to R/B.
+    for legacy, generic in (("v_lim_5sigma", "mag_lim_5sigma"),
+                            ("v_lim_100sigma", "mag_lim_100sigma"), ("v_sat", "mag_sat")):
+        row[legacy] = row[generic] if is_v else np.nan
     if provenance is not None:
         row.update(provenance(frame))
     return row

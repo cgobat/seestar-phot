@@ -14,7 +14,7 @@ print(frame.layout, frame.shape, frame.model)
 
 Whatever the file layout — on-board stack, raw Bayer sub, or a CrowdSky multi-extension
 frame — you get the same thing: a `(3, ny, nx)` float32 cube in R, G, B order.
-**Green is index 1 and is the science band** (≈ Johnson V through the IRCUT filter).
+**Green is index 1 and is the default science band** (≈ Johnson V through the IRCUT filter).
 
 ```python
 frame.g          # the green plane, (1000, 1000)

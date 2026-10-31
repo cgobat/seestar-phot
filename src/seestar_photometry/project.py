@@ -13,7 +13,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .calibration import FIT_MAG_RANGE
+from .calibration import CalibrationSpec, FIT_MAG_RANGE
 
 
 @dataclass
@@ -126,6 +126,13 @@ class Project:
         round, and -- being large -- isolated, so it passes every curve-of-growth cut and
         can end up sizing the aperture for the whole frame. See
         :data:`photometry.COG_MAX_SIZE_RATIO`.
+    band_calibrations : dict, optional
+        Map camera channels to :class:`calibration.CalibrationSpec` objects.
+        Default ``{"G": CalibrationSpec()}`` preserves G-to-V. Add R-to-Rc or
+        R-to-r with explicit reference columns, or configure another subset.
+        Catalogue columns must exist in the cached field catalogue; this does
+        not download or synthesize missing standard-band photometry. Rebuild
+        cached frame tables with ``force=True`` after changing calibrations.
     depth_kwargs : dict, optional
         Blank-aperture depth sampling settings: ``n_apertures``, ``n_iters``,
         ``seed`` (defaults 500, 5, 0). Existing frame-table rows must be rebuilt
@@ -156,9 +163,15 @@ class Project:
     mask: object = field(default=None, repr=False)
     isolation: float = None
     depth_kwargs: dict = field(default_factory=dict)
+    band_calibrations: dict = field(default_factory=lambda: {"G": CalibrationSpec()})
 
     def __post_init__(self):
         self.work_dir = Path(self.work_dir)
+        if not self.band_calibrations or any(
+            band not in ("R", "G", "B") or not isinstance(spec, CalibrationSpec)
+            for band, spec in self.band_calibrations.items()
+        ):
+            raise ValueError("band_calibrations must map R/G/B to CalibrationSpec objects")
 
     # --- derived paths ---------------------------------------------------------------
 

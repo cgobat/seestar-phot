@@ -153,7 +153,8 @@ def test_measurements_use_the_lightcurve_aperture(dataset):
     frame table's 0.90 one -- if these ever silently coincided, one of the two
     documented aperture choices would not be taking effect."""
     _stars, meas = pipeline.build_measurements(dataset, workers=1)
-    zp = np.unique(np.asarray(meas["zeropoint"], dtype=float))
+    green = meas[np.asarray(meas["band"]) == "G"]
+    zp = np.unique(np.asarray(green["zeropoint"], dtype=float))
     assert np.allclose(zp, expected_zeropoint(0.95), atol=0.03)
 
 
@@ -208,3 +209,53 @@ def test_load_tables_round_trips(dataset):
 def test_load_tables_returns_none_before_building(dataset):
     frames, stars, meas = pipeline.load_tables(dataset)
     assert frames is None and stars is None and meas is None
+
+
+def test_pipeline_calibrates_red_and_preserves_default_green(dataset, catalogue):
+    from seestar_photometry import CalibrationSpec
+
+    dataset.band_calibrations["R"] = CalibrationSpec(
+        reference_mag="r_jkc_mag", colour_columns=("b_jkc_mag", "r_jkc_mag"),
+        reference_system="Cousins R (Vega)",
+    )
+    table = pipeline.build_frame_table(dataset, workers=1, limit=1)
+    assert table["reference_system_R"][0] == "Cousins R (Vega)"
+    assert np.isfinite(table["mag_lim_5sigma_R"][0])
+    stars, measurements = pipeline.build_measurements(dataset, workers=1, limit=1)
+    red = measurements[np.asarray(measurements["band"]) == "R"]
+    assert np.all(np.isfinite(red["mag"]))
+    assert set(red["reference_system"]) == {"Cousins R (Vega)"}
+    reference = dict(zip(catalogue["source_id"], catalogue["r_jkc_mag"]))
+    residual = red["mag"] - np.array([reference[sid] for sid in red["source_id"]])
+    assert np.std(residual) < 0.03
+    blue = measurements[np.asarray(measurements["band"]) == "B"]
+    assert np.all(np.isnan(blue["mag"]))
+    assert np.all(np.isnan(blue["zeropoint"]))
+
+
+def test_custom_r_catalogue_survives_both_pipeline_stages(dataset, catalogue):
+    from seestar_photometry import CalibrationSpec, lightcurves
+
+    catalogue = catalogue.copy()
+    catalogue["r_ref"] = catalogue["r_jkc_mag"]
+    catalogue["g_ref"] = catalogue["b_jkc_mag"]
+    catalogue.write(dataset.catalogue_path, format="ascii.ecsv", overwrite=True)
+    dataset.band_calibrations = {"R": CalibrationSpec(
+        reference_mag="r_ref", colour_columns=("g_ref", "r_ref"),
+        reference_system="test r (AB)",
+    )}
+    table = pipeline.build_frame_table(dataset, workers=1, limit=1)
+    assert table["science_band"][0] == "R"
+    assert np.isnan(table["v_lim_5sigma"][0])
+    assert np.isfinite(table["mag_lim_5sigma"][0])
+    stars, measurements = pipeline.build_measurements(dataset, workers=1, limit=2)
+    assert "r_ref" in stars.colnames
+    comps = lightcurves.select_comparisons(
+        stars, dmag=None, colour_tol=None, mag_col="r_ref", exclude_variable=False
+    )
+    lc = lightcurves.differential_lightcurve(
+        measurements, lightcurves.target_id_of(stars), comps, band="R",
+        cat_mag_col="r_ref", inst_col="m_transformed",
+    )
+    assert len(lc) == 2
+    assert np.all(np.isfinite(lc["mag"]))

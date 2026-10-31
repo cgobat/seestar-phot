@@ -135,7 +135,7 @@ def build_stars(catalogue, source_ids, target_radec, target_id=None):
     present = np.isin(np.asarray(catalogue["source_id"]), np.asarray(source_ids))
     sub = catalogue[present]
     stars = Table()
-    for col in STAR_COLUMNS:
+    for col in dict.fromkeys((*STAR_COLUMNS, *sub.colnames)):
         if col in sub.colnames:
             stars[col] = sub[col]
     target = SkyCoord(target_radec[0] * u.deg, target_radec[1] * u.deg)

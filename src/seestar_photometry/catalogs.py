@@ -151,8 +151,11 @@ def sources_in_frame(catalogue, wcs, frame, margin=0.0):
     return catalogue[inside]
 
 
-def crossmatch_table(sources, wcs, catalogue, tol_arcsec=2.0, columns=GAIA_COLUMNS):
+def crossmatch_table(sources, wcs, catalogue, tol_arcsec=2.0, columns=None):
     """Augment a sources table with sky position and matched catalogue columns.
+
+    ``columns=None`` carries every catalogue column, including custom reference
+    magnitudes and colours. An explicit column sequence restricts that set.
 
     Every input row is kept and gains ``ra``, ``dec`` (from the WCS) and
     ``sep_arcsec`` (distance to its nearest catalogue source). The catalogue columns
@@ -172,7 +175,7 @@ def crossmatch_table(sources, wcs, catalogue, tol_arcsec=2.0, columns=GAIA_COLUM
     out["ra"] = ra
     out["dec"] = dec
     out["sep_arcsec"] = d2d.arcsec
-    for col in columns:
+    for col in catalogue.colnames if columns is None else columns:
         if col not in catalogue.colnames:
             continue
         name = {"ra": "cat_ra", "dec": "cat_dec"}.get(col, col)
