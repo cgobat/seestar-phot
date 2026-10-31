@@ -27,7 +27,7 @@ The recipe:
 pip install seestar-photometry
 ```
 
-Python ≥ 3.11. Core deps are `astropy`, `astroquery`, `numpy`, `scipy`, `sep` — about
+Python ≥ 3.11. Core deps are `astropy`, `astroquery`, `numpy`, `scipy`, `sep`, `photutils` — about
 140 kB of package on top of those. Extras:
 
 | Extra | Adds | For |

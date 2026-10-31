@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- Standard aperture photometry and growth curves now use Photutils with exact pixel
+  overlap. Final errors use spatial background RMS maps; `effective_gain=` optionally
+  includes source Poisson noise. Annulus subtraction propagates sky-mean uncertainty.
+  SEP remains the detection/background and optional Kron backend.
+
 ### Added
 
 - **Passbands for the S30 Pro and S50 Pro**, fitted by the same method as the S50's:

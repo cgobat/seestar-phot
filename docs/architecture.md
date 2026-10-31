@@ -5,11 +5,11 @@
 **Distribution `seestar-photometry`, import package `seestar_photometry`.** `src/` layout,
 hatchling backend, installed editable into a **uv** environment.
 
-Core deps: `astropy`, `astroquery`, `numpy`, `scipy`, `sep`. Everything else is an extra,
+Core deps: `astropy`, `astroquery`, `numpy`, `scipy`, `sep`, `photutils`. Everything else is an extra,
 so the measurement path installs and runs headless: `plot` (`matplotlib`), `stack`
 (`astroalign`, `scikit-image` — only local stacking needs a registration engine), `docs`,
 `notebook`. `dev` is the union of what the test suite exercises. Deliberately *not*
-dependencies: `photutils` (unused — all photometry is `sep`), `seestarpy` (declared but
+dependencies: `seestarpy` (declared but
 never imported by the predecessor), `crowdsky-client` (a future optional extra).
 
 `uv run pytest`, `uv run python ...`. Never `uv run --active`.

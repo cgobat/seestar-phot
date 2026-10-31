@@ -3,10 +3,10 @@
 How `photometry` measures flux, and why each choice was made. The numbers below were
 measured on the June–July 2026 MW Cam datasets (S50 + S30pro).
 
-## 1. SEP fixed circular aperture is the standard; Kron is a cross-check only
+## 1. Photutils fixed circular aperture is the standard; Kron is a cross-check only
 
 `extract_sources` detects with SEP (`sep.extract`, low threshold) and measures flux in a
-**fixed circular aperture**, keeping only sources with **SNR > 5**. Kron/AUTO photometry
+**fixed circular aperture** with Photutils `CircularAperture` and exact pixel overlap, keeping only sources with **SNR > 5**. Kron/AUTO photometry
 exists but lives in `kron`, and is not the science path.
 
 Detection uses a deliberately **low threshold (2σ)** so the SNR > 5 cut on the *aperture*
@@ -59,7 +59,7 @@ reported **5σ detection limit by ~1.35 mag** — a headline number. So the dete
 work in particular must not use an oversized aperture. Enclosed-fraction sizing is the
 compromise: near the SNR sweet spot while robust enough for differential work.
 
-FWHM is derived as `2 × half-light radius` (`sep.flux_radius`, Gaussian assumption;
+FWHM is derived as `2 × half-light radius` (`photutils.profiles.CurveOfGrowth`, Gaussian assumption;
 `GAUSS_FWHM = 2.0`).
 
 ### Two fractions, deliberately
@@ -178,3 +178,14 @@ out exactly `2.5·log₁₀(enclosed)` below the true total-flux zero point.
   has no effect there. `curve_of_growth(..., isolation=)` and `Project.isolation` let you
   lower it; check `n_stars` to see whether you are getting a measured aperture or the
   fallback. Lower it knowingly: the outer radii are what normalise the curve.
+
+### Measurement backend
+
+The standard path uses Photutils `CircularAperture`, `CircularAnnulus`, and
+`CurveOfGrowth`. SEP remains responsible for detection/background modelling and the
+separate Kron cross-check. Annulus subtraction propagates the uncertainty of the mean
+sky into the aperture error. Spatial background RMS maps replace a single global RMS
+for final flux errors. `effective_gain=` optionally adds source Poisson noise; it must
+describe the processed stack. These formal errors still assume independent pixels.
+Aperture flags retain the numeric values 16 (truncated), 32 (masked pixels), and
+64 (no usable pixels). Missing pixels are excluded without rescaling the flux.

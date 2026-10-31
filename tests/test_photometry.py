@@ -195,3 +195,57 @@ def test_extraction_works_on_mef_layout(mef_frame, cube_frame):
     b = photometry.extract_sources(mef_frame)
     np.testing.assert_allclose(a.aperture, b.aperture, rtol=1e-9)
     assert len(a.sources) == len(b.sources)
+
+
+def test_exact_aperture_and_annulus_error_propagation():
+    """Uniform sky has a known integral and a known independent-noise variance."""
+    data = np.full((80, 80), 12.0)
+    r, inner, outer, sigma = 3.4, 8.0, 12.0, 2.0
+    area = np.pi * r**2
+    flux, error, flag = photometry._aperture_flux(data, [40.2], [39.7], r, sigma)
+    assert flux[0] == pytest.approx(12 * area)
+    assert 0 < error[0]**2 <= sigma**2 * area * (1 + 1e-12)
+    assert flag[0] == 0
+    flux, error, flag = photometry._aperture_flux(
+        data, [40.2], [39.7], r, sigma, bkgann=(inner, outer)
+    )
+    assert flux[0] == pytest.approx(0, abs=1e-10)
+    # Use fully covered pixels to make the expected variance independent of the
+    # fractional-pixel error convention in different Photutils releases.
+    mask = np.ones(data.shape, dtype=bool)
+    mask[39:42, 39:42] = False
+    mask[40, 49] = mask[40, 31] = False
+    mask[49, 40] = mask[31, 40] = False
+    flux, error, flag = photometry._aperture_flux(
+        data, [40], [40], r, sigma, bkgann=(inner, outer), mask=mask
+    )
+    assert flux[0] == pytest.approx(0, abs=1e-10)
+    assert error[0]**2 == pytest.approx(sigma**2 * (9 + 9**2 / 4))
+    with pytest.raises(ValueError, match="must not overlap"):
+        photometry._aperture_flux(data, [40], [40], r, sigma, bkgann=(2, 8))
+
+
+def test_invalid_and_truncated_apertures_are_flagged():
+    data = np.ones((40, 40))
+    data[20, 20] = np.nan
+    flux, error, flag = photometry._aperture_flux(
+        data, [20, 0, -50, np.nan], [20, 0, -50, 20], 3, 1
+    )
+    assert flag[0] & photometry.APER_HASMASKED
+    assert np.isfinite(flux[0])
+    assert flag[1] & photometry.APER_TRUNC
+    assert np.all(flag[2:] != 0)
+    assert np.all(np.isnan(flux[2:]))
+
+
+def test_effective_gain_adds_source_noise(cube_frame, catalogue, wcs):
+    args = (cube_frame, catalogue["ra"], catalogue["dec"], wcs)
+    background_only = photometry.forced_photometry(*args, aperture=6)
+    poisson = photometry.forced_photometry(*args, aperture=6, effective_gain=2.0)
+    np.testing.assert_allclose(poisson["flux"], background_only["flux"])
+    # Source variance scales inversely with effective gain.
+    extra = np.asarray(poisson["fluxerr"])**2 - np.asarray(background_only["fluxerr"])**2
+    double_gain = photometry.forced_photometry(*args, aperture=6, effective_gain=4.0)
+    extra_double = np.asarray(double_gain["fluxerr"])**2 - np.asarray(background_only["fluxerr"])**2
+    assert np.all(extra > 0)
+    np.testing.assert_allclose(extra, 2 * extra_double, rtol=1e-5)

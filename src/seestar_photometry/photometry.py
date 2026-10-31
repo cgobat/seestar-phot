@@ -46,6 +46,11 @@ from .frames import BANDS
 #: FWHM of a Gaussian PSF in units of its half-light (50%-flux) radius.
 GAUSS_FWHM = 2.0
 
+#: Aperture flags retain SEP's numeric values for existing table consumers.
+APER_TRUNC = 16
+APER_HASMASKED = 32
+APER_ALLMASKED = 64
+
 #: SNR floor for a detection to enter the ``sources`` table. Deliberately the cut
 #: that defines the sample -- the detection threshold is kept well below it.
 SNR_MIN = 5.0
@@ -259,33 +264,79 @@ def _max_in_aperture(data, x, y, r):
     return out
 
 
+def _aperture_flux(data, x, y, radius, error, bkgann=None, mask=None):
+    """Exact Photutils sums, annulus-error propagation, and aperture flags.
+
+    Excluded or missing pixels are never filled or rescaled to a full aperture.
+    Such measurements are flagged so callers can reject them. Off-image and
+    non-finite positions retain a row with NaN flux and a nonzero flag.
+    """
+    from photutils.aperture import CircularAnnulus, CircularAperture
+
+    if bkgann is not None and bkgann[0] < radius:
+        raise ValueError("background annulus must not overlap the source aperture")
+    positions = np.column_stack([x, y])
+    flux = np.full(len(positions), np.nan)
+    fluxerr = np.full(len(positions), np.nan)
+    flags = np.full(len(positions), APER_ALLMASKED, dtype=np.int16)
+    finite = np.all(np.isfinite(positions), axis=1)
+    if not finite.any():
+        return flux, fluxerr, flags
+    error = np.broadcast_to(error, data.shape)
+    invalid = ~np.isfinite(data) | ~np.isfinite(error)
+    if mask is not None:
+        invalid |= mask
+    aperture = CircularAperture(positions[finite], r=radius)
+    sums, errors = aperture.do_photometry(data, error=error, mask=invalid)
+    area = aperture.area_overlap(data, mask=invalid)
+    covered = aperture.area_overlap(data)
+    flag = np.zeros(len(sums), dtype=np.int16)
+    flag[~np.isfinite(covered) | (covered < aperture.area - 1e-6)] |= APER_TRUNC
+    flag[np.isfinite(covered) & (area < covered - 1e-6)] |= APER_HASMASKED
+    flag[~np.isfinite(area) | (area <= 0)] |= APER_ALLMASKED
+    if bkgann is not None:
+        annulus = CircularAnnulus(positions[finite], r_in=bkgann[0], r_out=bkgann[1])
+        sky, skyerr = annulus.do_photometry(data, error=error, mask=invalid)
+        skyarea = annulus.area_overlap(data, mask=invalid)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            sums -= area * sky / skyarea
+            errors = np.sqrt(errors**2 + (area * skyerr / skyarea)**2)
+        flag[~np.isfinite(skyarea) | (skyarea <= 0)] |= APER_ALLMASKED
+        flag[np.isfinite(skyarea) & (skyarea < annulus.area - 1e-6)] |= APER_TRUNC
+    flux[finite], fluxerr[finite], flags[finite] = sums, errors, flag
+    return flux, fluxerr, flags
+
+
 def _bright_round(data_sub, objs, rms, snr_min, ref_radius=10.0, mask=None):
     """Mask of bright, round, unflagged sources for PSF/COG measurement.
 
     A ``mask`` additionally rejects sources whose reference aperture *overlaps* a masked
-    pixel, via SEP's ``APER_HASMASKED`` flag -- a knot just outside the region is as bad
+    pixel, via the ``APER_HASMASKED`` flag -- a knot just outside the region is as bad
     for the aperture as one inside it. The bit cannot be set without a mask, so passing
     ``None`` leaves the selection bit-identical to before.
     """
-    flux, fluxerr, flag = sep.sum_circle(
-        data_sub, objs["x"], objs["y"], ref_radius, err=rms, mask=mask
+    flux, fluxerr, flag = _aperture_flux(
+        data_sub, objs["x"], objs["y"], ref_radius, error=rms, mask=mask
     )
     return (
         (flux / fluxerr > snr_min)
         & (objs["b"] / objs["a"] > 0.7)
-        & ((flag & sep.APER_HASMASKED) == 0)
+        & ((flag & APER_HASMASKED) == 0)
     )
 
 
 def _fwhm_from(data_sub, objs, rms, snr_min=SNR_PSF, mask=None):
     """Median FWHM (px) from the half-light radii of bright round stars."""
-    flux, _, _ = sep.sum_circle(data_sub, objs["x"], objs["y"], 10.0, err=rms, mask=mask)
-    rhalf, flag = sep.flux_radius(
-        data_sub, objs["x"], objs["y"], 6.0 * objs["a"], 0.5,
-        normflux=flux, subpix=5,
-    )
-    sel = _bright_round(data_sub, objs, rms, snr_min, mask=mask) & (flag == 0)
-    return GAUSS_FWHM * float(np.median(rhalf[sel]))
+    from photutils.profiles import CurveOfGrowth
+
+    sel = _bright_round(data_sub, objs, rms, snr_min, mask=mask)
+    radii = np.arange(0.5, 10.5, 0.5)
+    half_light = []
+    for x, y in zip(objs["x"][sel], objs["y"][sel]):
+        profile = CurveOfGrowth(data_sub, (x, y), radii, mask=mask)
+        profile.normalize()
+        half_light.append(float(profile.calc_radius_at_ee(0.5)))
+    return GAUSS_FWHM * float(np.nanmedian(half_light)) if half_light else np.nan
 
 
 def _cog_from(data_sub, objs, rms, radii, snr_min=SNR_PSF, mask=None,
@@ -312,9 +363,9 @@ def _cog_from(data_sub, objs, rms, radii, snr_min=SNR_PSF, mask=None,
     x, y = objs["x"], objs["y"]
     if not len(objs):
         return _empty_cog(radii)
-    measured = [sep.sum_circle(data_sub, x, y, r, err=rms, mask=mask) for r in radii]
-    flux = np.array([m[0] for m in measured])
-    flag = np.array([m[2] for m in measured])
+    from photutils.profiles import CurveOfGrowth
+
+    _, _, flag = _aperture_flux(data_sub, x, y, radii.max(), rms, mask=mask)
     nn_dist = cKDTree(np.column_stack([x, y])).query(
         np.column_stack([x, y]), k=2
     )[0][:, 1]
@@ -323,12 +374,16 @@ def _cog_from(data_sub, objs, rms, radii, snr_min=SNR_PSF, mask=None,
     clean = (
         bright
         & _point_like(objs, bright, size_ratio)
-        & (flag.sum(axis=0) == 0)
+        & (flag == 0)
         & (nn_dist > isolation)
     )
     if not clean.any():
         return _empty_cog(radii)
-    norm = flux[:, clean] / flux[-1, clean]
+    profiles = []
+    for cx, cy in zip(x[clean], y[clean]):
+        profile = CurveOfGrowth(data_sub, (cx, cy), radii, mask=mask)
+        profiles.append(profile.profile / profile.profile[-1])
+    norm = np.asarray(profiles).T
     t = Table()
     t["radius"] = radii
     t["flux_frac"] = np.median(norm, axis=1)
@@ -484,7 +539,7 @@ def _per_band_setup(frame, thresh, aperture, enclosed, n_fwhm, mask=None,
 
 def extract_sources(
     frame, thresh=2.0, aperture=None, enclosed=0.90, n_fwhm=None, bkgann=None,
-    mask=None, isolation=None,
+    mask=None, isolation=None, effective_gain=None,
 ):
     """Detect sources and measure fixed circular-aperture flux across R, G, B.
 
@@ -517,6 +572,12 @@ def extract_sources(
         **not** alter the flux of any source that is measured: a star whose aperture
         overlaps the mask is still summed over all its pixels, because silently changing a
         reported flux is worse than reporting a contaminated one.
+    effective_gain : float or np.ndarray, optional
+        Electrons per image unit for this processed image, as a scalar, 2-D map,
+        or RGB cube. Adds source Poisson noise with Photutils ``calc_total_error``.
+        Do not substitute a raw-frame gain for the effective gain of a stack.
+        Without it, errors contain spatial background noise only; neither mode
+        includes resampling covariance.
     isolation : float, optional
         Nearest-neighbour distance (px) a curve-of-growth candidate must clear. Default
         ``2 * COG_RADII.max()``; lower it in crowded fields, where the default can leave
@@ -526,6 +587,8 @@ def extract_sources(
     -------
     Extraction
     """
+    from photutils.utils import calc_total_error
+
     background = np.empty_like(frame.data)
     rms = np.empty(3, dtype=np.float32)
     apertures = np.empty(3)
@@ -540,8 +603,12 @@ def extract_sources(
         fwhms[i] = fwhm
         apertures[i] = ap
         cogs[i] = cog
-        flux, fluxerr, flag = sep.sum_circle(
-            data_sub, objs["x"], objs["y"], ap, err=bkg.globalrms, bkgann=bkgann,
+        error = bkg.rms()
+        if effective_gain is not None:
+            gain = np.asarray(effective_gain)
+            error = calc_total_error(data_sub, error, gain[i] if gain.ndim == 3 else gain)
+        flux, fluxerr, flag = _aperture_flux(
+            data_sub, objs["x"], objs["y"], ap, error=error, bkgann=bkgann,
         )
         snr = flux / fluxerr
         keep = snr > SNR_MIN
@@ -568,7 +635,7 @@ def extract_sources(
 def forced_photometry(
     frame, ra, dec, wcs, source_id=None, thresh=2.0,
     aperture=None, enclosed=0.90, n_fwhm=None, bkgann=None, mask=None,
-    isolation=None,
+    isolation=None, effective_gain=None,
 ):
     """Forced fixed-aperture photometry at given sky positions, across R, G, B.
 
@@ -590,7 +657,7 @@ def forced_photometry(
     source_id : array-like, optional
         A stable identifier per position (e.g. Gaia ``source_id``), carried through
         to the output table.
-    thresh, aperture, enclosed, n_fwhm, bkgann, mask, isolation
+    thresh, aperture, enclosed, n_fwhm, bkgann, mask, isolation, effective_gain
         As in :func:`extract_sources`. Note that ``mask`` governs the background and the
         aperture sizing only: **every** requested position is still measured, including
         one that falls inside the mask, because forced photometry's contract is to return
@@ -605,6 +672,8 @@ def forced_photometry(
         ``x``, ``y``, ``flux``, ``fluxerr``, ``snr``, ``flag``, ``max_pix_value``
         and ``on_chip``. Per-band ``aperture`` and ``fwhm`` land in ``meta``.
     """
+    from photutils.utils import calc_total_error
+
     ra = np.asarray(ra, dtype=float)
     dec = np.asarray(dec, dtype=float)
     x, y = wcs.world_to_pixel_values(ra, dec)
@@ -619,8 +688,12 @@ def forced_photometry(
     ):
         fwhms[i] = fwhm
         apertures[i] = ap
-        flux, fluxerr, flag = sep.sum_circle(
-            data_sub, x, y, ap, err=bkg.globalrms, bkgann=bkgann,
+        error = bkg.rms()
+        if effective_gain is not None:
+            gain = np.asarray(effective_gain)
+            error = calc_total_error(data_sub, error, gain[i] if gain.ndim == 3 else gain)
+        flux, fluxerr, flag = _aperture_flux(
+            data_sub, x, y, ap, error=error, bkgann=bkgann,
         )
         max_pix = _max_in_aperture(frame.data[i], x, y, ap)
         t = Table()
