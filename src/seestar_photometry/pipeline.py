@@ -365,9 +365,6 @@ def _report_frame_summary(table):
 
 def _measure_sources(key, project):
     """Forced photometry + calibration for one frame. Returns a measurement Table."""
-    import astropy.units as u
-    from astropy.coordinates import SkyCoord
-
     from . import astrometry, calibration, catalogs, frames, lightcurves, photometry
 
     path = project.source.path(key)
@@ -400,7 +397,7 @@ def _measure_sources(key, project):
             ) for band, spec in project.band_calibrations.items()
         }
 
-        target = SkyCoord(project.target.ra * u.deg, project.target.dec * u.deg)
+        target = project.target.coord
         meta = frames.frame_metadata(frame)
         times = lightcurves.frame_times(frame.header, target, meta["total_exptime"])
 

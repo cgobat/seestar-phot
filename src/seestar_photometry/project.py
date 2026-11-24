@@ -12,6 +12,7 @@ in :mod:`pipeline` that take a project as their first argument.
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from astropy.coordinates import SkyCoord
 
 from .calibration import CalibrationSpec, FIT_MAG_RANGE
 
@@ -39,8 +40,17 @@ class Target:
     source_id: int = None
 
     @property
+    def coord(self):
+        return SkyCoord(ra=self.ra, dec=self.dec, unit="deg", frame="icrs")
+
+    @property
     def radec(self):
         return (self.ra, self.dec)
+
+    @classmethod
+    def from_name(cls, name: str, source_id: int = None):
+        coord = SkyCoord.from_name(name)
+        return cls(name, coord.ra.deg, coord.dec.deg, source_id)
 
 
 @dataclass
