@@ -458,43 +458,10 @@ def cone(center, radius_deg, directory=None, vmag_limit=None, gmag_limit=None,
 
 
 def propagate_epoch(catalogue, epoch, ref_epoch=REF_EPOCH):
-    """Move catalogue positions from Gaia's epoch to the observing epoch.
+    """Propagate angular coordinates through the common Astropy implementation."""
+    from .catalogs import propagate_epoch as propagate
 
-    Gaia DR3 positions are J2016.0. Ten years later a star with a 100 mas/yr proper
-    motion has moved 1 arcsec -- half the default 2 arcsec match tolerance, and enough
-    to lose the match entirely on the fastest movers. The TAP path cannot do this at all
-    because it never fetches proper motions.
-
-    Linear propagation on the tangent plane, which is right to well under a milliarcsec
-    over a decade. ``pmra`` is Gaia's ``pmra*``, already multiplied by ``cos(dec)``, so
-    it is divided back out to get a change in right ascension.
-    """
-    dt = float(epoch) - float(ref_epoch)
-    dec = np.asarray(catalogue["dec"], dtype=float)
-    # np.asarray, because filling a MaskedColumn returns a *Column* that still carries
-    # the proper motion's ``mas / yr``. Column arithmetic then propagates that unit onto
-    # the result, and assigning it back would relabel ``ra``/``dec`` as proper motions:
-    # the numbers stay right, the unit becomes a lie, and the next SkyCoord built from
-    # the catalogue raises rather than returning a wrong position -- which is the only
-    # reason this was ever noticed.
-    pmra = np.asarray(np.ma.filled(catalogue["pmra"], 0.0), dtype=float)
-    pmdec = np.asarray(np.ma.filled(catalogue["pmdec"], 0.0), dtype=float)
-
-    # cos(dec) is floored rather than guarded: within a few mas of a pole right
-    # ascension is meaningless anyway, and a division by zero here would produce a NaN
-    # position that reads as a real source.
-    cos_dec = np.maximum(np.cos(np.radians(dec)), 1e-8)
-
-    # Written *into* the existing columns, not assigned over them. `out["ra"] = array`
-    # replaces the column and silently drops its ``deg``, which then reaches
-    # ``SkyCoord`` as a dimensionless number; a slice assignment keeps the column, its
-    # dtype and its unit, and only moves the values.
-    out = catalogue.copy()
-    out["ra"][:] = np.mod(np.asarray(catalogue["ra"], dtype=float)
-                          + pmra * dt / 3.6e6 / cos_dec, 360.0)
-    out["dec"][:] = dec + pmdec * dt / 3.6e6
-    out.meta["epoch"] = float(epoch)
-    return out
+    return propagate(catalogue, epoch, ref_epoch=ref_epoch)
 
 
 # --- writing ------------------------------------------------------------------------------

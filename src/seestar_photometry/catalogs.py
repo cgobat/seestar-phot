@@ -58,6 +58,51 @@ def _fetch_cone(ra, dec, radius, gmag_limit):
     return gaia.launch_job_async(_cone_query(ra, dec, radius, gmag_limit)).get_results()
 
 
+def propagate_epoch(catalogue, epoch, ref_epoch=2016.0):
+    """Propagate Gaia coordinates with SkyCoord, preserving degree column units.
+
+    ``pmra`` is Gaia's cos(dec)-weighted proper motion. Sources lacking either
+    proper-motion component keep their original coordinates and reference epoch;
+    ``epoch_propagated`` records which rows moved. ``epoch`` accepts Time or a
+    Julian year. No distance or radial-velocity correction is inferred.
+    """
+    import warnings
+    from astropy.time import Time
+
+    target = epoch if isinstance(epoch, Time) else Time(epoch, format="jyear")
+    out = catalogue.copy()
+    names = ("ra", "dec", "pmra", "pmdec")
+    units = (u.deg, u.deg, u.mas / u.yr, u.mas / u.yr)
+    values = []
+    for name, unit in zip(names, units):
+        column = catalogue[name]
+        quantity = u.Quantity(np.ma.filled(column, np.nan),
+                              unit=getattr(column, "unit", None) or unit)
+        values.append(quantity.to_value(unit))
+    good = np.all(np.isfinite(values), axis=0)
+    origin = np.asarray(catalogue["ref_epoch"], float).copy() if "ref_epoch" in catalogue.colnames \
+        else np.full(len(catalogue), ref_epoch)
+    good &= np.isfinite(origin)
+    if good.any():
+        positions = SkyCoord(
+            ra=values[0][good] * u.deg, dec=values[1][good] * u.deg,
+            pm_ra_cosdec=values[2][good] * u.mas / u.yr,
+            pm_dec=values[3][good] * u.mas / u.yr, obstime=Time(origin[good], format="jyear"),
+        )
+        with warnings.catch_warnings():
+            # ERFA warns about the omitted distance; angular-only propagation is intended.
+            from erfa import ErfaWarning
+            warnings.simplefilter("ignore", ErfaWarning)
+            moved = positions.apply_space_motion(new_obstime=target)
+        out["ra"][good] = moved.ra.to_value(getattr(out["ra"], "unit", None) or u.deg)
+        out["dec"][good] = moved.dec.to_value(getattr(out["dec"], "unit", None) or u.deg)
+    origin[good] = target.jyear
+    out["ref_epoch"] = origin
+    out["epoch_propagated"] = good
+    out.meta["epoch"] = float(target.jyear)
+    return out
+
+
 def _tile_centers(center, half_size_deg, n_tiles):
     """Grid of tile centres (ra, dec) as true angular offsets around ``center``.
 
@@ -114,7 +159,12 @@ def fetch_gaia_catalogue(
     center = (float(centre.ra.deg), float(centre.dec.deg))
     cache_path = Path(cache_path)
     if cache_path.exists() and not overwrite:
-        return Table.read(cache_path)
+        catalogue = Table.read(cache_path)
+        if epoch is not None:
+            catalogue = propagate_epoch(catalogue, epoch,
+                                        ref_epoch=catalogue.meta.get("epoch", 2016.0))
+            catalogue.write(cache_path, format="ascii.ecsv", overwrite=True)
+        return catalogue
 
     import time
 
@@ -149,6 +199,8 @@ def fetch_gaia_catalogue(
             catalogue.meta.update(catalogue_source="Gaia DR3 TAP GSPC", epoch=2016.0,
                                   catalogue_schema=2, query_ra=center[0], query_dec=center[1],
                                   query_half_size_deg=half_size_deg, query_gmag_limit=gmag_limit)
+            if epoch is not None:
+                catalogue = propagate_epoch(catalogue, epoch)
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             catalogue.write(cache_path, format="ascii.ecsv", overwrite=True)
             return catalogue
