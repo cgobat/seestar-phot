@@ -24,6 +24,9 @@ Several solvers, same sidecar, chosen with ``solver=``:
 ``"solve-field"``
     Local astrometry.net CLI with installed index files; no API key required.
 
+``"stellarsolver"``
+    StellarSolver CLI with installed astrometry.net index files; reads a solved FITS.
+
 ``"nova"``
     astrometry.net's web service, fed our own SEP source list (not the image) with
     the header pointing and pixel scale as hints. Useful as a fallback when ASTAP
@@ -348,6 +351,45 @@ def solve_field(frame, force=False, executable=None, config=None, timeout=120,
         _run_solver(cmd + [str(image)], timeout)
         if not solved.is_file() or solved.read_bytes()[:1] != b"\x01":
             raise RuntimeError("solve-field finished without a solved marker; check index coverage and hints")
+        return _cache_solver_output(output, frame, wcs_cache_path(frame.path))
+
+
+def solve_stellarsolver(frame, force=False, executable=None, index_dir=None,
+                       config=None, profile=None, timeout=120, band="G",
+                       center=None, radius=2.0, scale=None, scale_err=10.0):
+    """Solve through StellarSolver's CLI and read its solved FITS as Astropy WCS.
+
+    Requires ``stellarsolver-cli`` (built with ``BUILD_CLI=ON``) and astrometry.net
+    index files. ``index_dir`` takes precedence over ``config``. The CLI reads only
+    the last ``add_path`` in a config file, rather than the full astrometry.net
+    configuration. ``profile`` is a built-in profile name supported by that CLI.
+    Search hints and cache semantics match :func:`solve_field`.
+    """
+    import tempfile
+
+    if not force:
+        cached = load_wcs(frame)
+        if cached is not None:
+            return cached
+    exe = _solver_executable("stellarsolver-cli", executable, "STELLARSOLVER_CLI")
+    center, radius, bounds = _solver_hints(frame, center, radius, scale, scale_err)
+    with tempfile.TemporaryDirectory(prefix="stellarsolver_") as td:
+        image, output = (Path(td) / name for name in ("image.fits", "solved.fits"))
+        fits.PrimaryHDU(data=frame.plane(band).data.astype("float32")).writeto(image)
+        cmd = [exe, "--save-fits", str(output), "--cpulimit", str(int(np.ceil(timeout)))]
+        if index_dir is not None:
+            cmd += ["--index-files", str(Path(index_dir).expanduser().resolve())]
+        elif config is not None:
+            cmd += ["--config", str(Path(config).expanduser().resolve())]
+        if profile is not None:
+            cmd += ["--built-in-profile", str(profile)]
+        if center is not None:
+            # StellarSolver calls this --degrees, not solve-field's --radius.
+            cmd += ["--ra", str(center.ra.deg), "--dec", str(center.dec.deg), "--degrees", str(radius)]
+        if bounds is not None:
+            cmd += ["--scale-units", "arcsecperpix", "--scale-low", str(bounds[0]),
+                    "--scale-high", str(bounds[1])]
+        _run_solver(cmd + [str(image)], timeout)
         return _cache_solver_output(output, frame, wcs_cache_path(frame.path))
 
 
@@ -933,10 +975,12 @@ def solve_from_sources(frame, x, y, api_key=None, force=False, solver="nova",
                        astap_exe=None, catalog=None, solver_options=None):
     """Solve using an already-measured source list where the solver can use one.
 
-    ASTAP detects its own stars, so the source list is simply ignored there; this
+    Image-based CLI solvers detect their own stars, so the source list is ignored; this
     exists so ``Extraction.solve_wcs`` can call one function regardless of solver.
     """
     options = dict(solver_options or {})
+    if solver == "stellarsolver":
+        return solve_stellarsolver(frame, force=force, **options)
     if solver == "solve-field":
         return solve_field(frame, force=force, **options)
     if solver == "astap":
@@ -946,7 +990,7 @@ def solve_from_sources(frame, x, y, api_key=None, force=False, solver="nova",
     if solver == "local":
         return solve_local(frame, _require_catalog(catalog), x=x, y=y, force=force, **options)
     raise ValueError(
-        f"unknown solver {solver!r} (expected 'astap', 'solve-field', 'nova' or 'local')"
+        f"unknown solver {solver!r} (expected 'astap', 'solve-field', 'stellarsolver', 'nova' or 'local')"
     )
 
 
@@ -966,8 +1010,8 @@ def solve(frame, solver="astap", api_key=None, force=False, astap_exe=None,
 
     ``solver="lift"`` copies a trustworthy header solution instead of solving.
     ``"local"`` and ``"nova"`` both extract the frame first -- one to pair against
-    ``catalog``, the other to build the source list it uploads; ``"astap"`` detects
-    its own stars and needs neither.
+    ``catalog``, the other to build the source list it uploads. The CLI backends
+    detect their own stars. ``solver_options`` supplies backend keyword arguments.
     """
     if not force:
         cached = load_wcs(frame)
@@ -976,6 +1020,8 @@ def solve(frame, solver="astap", api_key=None, force=False, astap_exe=None,
     if solver == "lift":
         return lift(frame, force=force)
     options = dict(solver_options or {})
+    if solver == "stellarsolver":
+        return solve_stellarsolver(frame, force=force, **options)
     if solver == "solve-field":
         return solve_field(frame, force=force, **options)
     if solver == "astap":
@@ -991,7 +1037,7 @@ def solve(frame, solver="astap", api_key=None, force=False, astap_exe=None,
             api_key=api_key, force=force, solver="nova", solver_options=options
         )
     raise ValueError(
-        f"unknown solver {solver!r} (expected 'astap', 'solve-field', 'local', 'nova' or 'lift')"
+        f"unknown solver {solver!r} (expected 'astap', 'solve-field', 'stellarsolver', 'local', 'nova' or 'lift')"
     )
 
 

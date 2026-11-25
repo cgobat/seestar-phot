@@ -72,11 +72,13 @@ class Project:
         ``"astap"`` (default, local and offline), ``"local"`` (anchored on the reference
         catalog -- no binary, no network, no index files), ``"nova"``
         (remote astrometry.net), ``"solve-field"`` (local astrometry.net with indexes),
-        or ``"lift"`` for frames that already carry a trustworthy
-        header solution.
+        ``"stellarsolver"`` (StellarSolver CLI), or ``"lift"`` for frames that already
+        carry a trustworthy header solution.
     solver_options : dict, optional
         Keyword options for the selected solver, for example ``executable``,
-        ``config`` and ``timeout`` for ``"solve-field"``. See :func:`astrometry.solve_field`.
+        ``config`` and ``timeout`` for ``"solve-field"``; ``index_dir`` for
+        ``"stellarsolver"``. See :func:`astrometry.solve_field` and
+        :func:`astrometry.solve_stellarsolver`.
     astap_exe : str, optional
         Path to the ASTAP command-line binary. Leave unset and it is located
         automatically: ``$ASTAP_EXE``, then ``PATH`` (which covers ``apt install
