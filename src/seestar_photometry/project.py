@@ -105,7 +105,8 @@ class Project:
     match_tol_arcsec : float
         Cross-match radius.
     catalogue_backend : str
-        Where the reference catalogue comes from. ``"auto"`` (default) uses the offline
+        Where the reference catalogue comes from. ``"tap"`` (default) queries Gaia
+        directly and caches the field. ``"auto"`` explicitly opts into the offline
         copy when :mod:`gaiadb` has this field on disk and falls back to a Gaia TAP
         query when it does not, so installing the download is the only step needed to
         stop using the network. ``"local"`` and ``"tap"`` force one or the other;
@@ -114,9 +115,9 @@ class Project:
     epoch : float
         Decimal year to propagate catalogue positions to, e.g. ``2026.4``. Gaia
         positions are J2016.0, and a decade of proper motion moves the fastest stars by
-        more than ``match_tol_arcsec``. Only the local backend can do this -- the TAP
-        query does not fetch proper motions -- so it is ignored with a TAP catalogue.
-        ``None`` leaves positions at the Gaia epoch.
+        more than ``match_tol_arcsec``. Both TAP and offline catalogues can use
+        SkyCoord space-motion propagation. Missing proper motions leave a source
+        at its original coordinates. ``None`` leaves positions at the Gaia epoch.
     provenance : callable, optional
         ``provenance(frame) -> dict`` of extra frame-table columns (dataset name,
         stacking manifest fields, ...). Keeps project bookkeeping out of the core
@@ -237,26 +238,14 @@ class Project:
 
     def catalogue_backend_used(self):
         """Which backend :meth:`catalogue` would use. Touches no network."""
+        if self.catalogue_backend not in ("auto", "tap", "local"):
+            raise ValueError("catalogue_backend must be tap, local or auto")
         if self.catalogue_backend != "auto":
             return self.catalogue_backend
         from . import gaiadb
 
         return "local" if gaiadb.covers(
             self.target.radec, self.catalogue_radius_deg) else "tap"
-
-    def fetch_catalogue(self, **kwargs):
-        """Download the offline catalogue for this field, if it is not already here.
-
-        The radius that matters is :attr:`catalogue_radius_deg`, not the field of view:
-        the cached catalogue covers a whole night's dithering, and the cone has to reach
-        the corners of that box. Fetching a frame's worth instead leaves
-        :meth:`catalogue_backend_used` answering ``"tap"`` for no obvious reason, which
-        is why this exists rather than leaving callers to work the radius out.
-        """
-        from . import gaiadb
-
-        return gaiadb.download(center=self.target.radec,
-                               radius_deg=self.catalogue_radius_deg, **kwargs)
 
     def catalogue(self, overwrite=False):
         """Load (or build once) the cached reference catalogue for this field.
@@ -268,7 +257,13 @@ class Project:
 
         self.ensure_dirs()
         if self.catalogue_path.exists() and not overwrite:
-            return catalogs.load_catalogue(self.catalogue_path)
+            catalogue = catalogs.load_catalogue(self.catalogue_path)
+            catalogs.validate_catalogue(catalogue, self.band_calibrations)
+            if self.epoch is not None and catalogue.meta.get("epoch") != self.epoch:
+                catalogue = catalogs.propagate_epoch(catalogue, self.epoch,
+                            ref_epoch=catalogue.meta.get("epoch", 2016.0))
+                catalogue.write(self.catalogue_path, format="ascii.ecsv", overwrite=True)
+            return catalogue
 
         if self.catalogue_backend_used() == "local":
             from . import gaiadb
@@ -280,11 +275,16 @@ class Project:
             catalogue.write(self.catalogue_path, format="ascii.ecsv", overwrite=True)
             return catalogue
 
-        return catalogs.fetch_gaia_mosaic(
+        catalogue = catalogs.fetch_gaia_catalogue(
             self.target.radec, self.catalogue_path,
             half_size_deg=self.catalogue_half_deg, n_tiles=self.catalogue_tiles,
-            gmag_limit=self.gmag_limit, overwrite=overwrite,
+            gmag_limit=self.gmag_limit, overwrite=overwrite, epoch=self.epoch,
         )
+        catalogs.validate_catalogue(catalogue, self.band_calibrations)
+        return catalogue
+
+    # Fetching now uses the configured catalogue backend, not a third-party download.
+    fetch_catalogue = catalogue
 
     @property
     def api_key(self):

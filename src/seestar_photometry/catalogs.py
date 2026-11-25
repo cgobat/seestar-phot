@@ -7,12 +7,10 @@ cache it as an ECSV. Every frame then subsets the cached catalogue to its own
 footprint (:func:`sources_in_frame`); no per-frame catalogue queries are needed,
 which is what makes the per-frame work pure CPU and trivially parallel.
 
-The query carries Gaia DR3 synthetic Johnson-Kron-Cousins V (``v_jkc_mag``) -- the
-reference magnitude for this project -- plus ``b_jkc_mag``/``r_jkc_mag`` for a
-synthetic B-R colour (left join on ``gaiadr3.synthetic_photometry_gspc``, null where
-absent), and ``phot_variable_flag`` for vetting variables later. Gaia synthetic V
-beats APASS here: it is homogeneous, and its colour information is what makes the
-per-frame colour term fittable.
+The direct Gaia DR3 TAP query joins GSPC Johnson-Kron-Cousins B/V/R and
+SDSS g/r/i photometry, including flux errors and validation flags. Missing
+synthetic magnitudes remain masked; the chosen calibration selects its own
+reference columns. Proper motions are available for optional epoch propagation.
 
 See ``docs/astrometry-and-gaia.md``.
 """
@@ -25,21 +23,23 @@ import numpy as np
 from astropy.coordinates import SkyCoord, SkyOffsetFrame
 from astropy.table import MaskedColumn, Table, unique, vstack
 
+GSPC_BANDS = ("b_jkc", "v_jkc", "r_jkc", "g_sdss", "r_sdss", "i_sdss")
 #: Catalogue columns carried through the field query and the cross-match.
 GAIA_COLUMNS = (
-    "source_id", "ra", "dec",
+    "source_id", "ra", "dec", "ref_epoch", "pmra", "pmdec",
     "phot_g_mean_mag", "phot_bp_mean_mag", "phot_rp_mean_mag", "bp_rp",
     "phot_variable_flag",
-    "v_jkc_mag", "b_jkc_mag", "r_jkc_mag",
-)
+) + tuple(f"{band}_{suffix}" for band in GSPC_BANDS
+          for suffix in ("mag", "flux", "flux_error", "flag"))
 
 
 def _cone_query(ra, dec, radius, gmag_limit):
+    photometry = ", ".join(f"s.{band}_{suffix}" for band in GSPC_BANDS
+                           for suffix in ("mag", "flux", "flux_error", "flag"))
     return f"""
-        SELECT g.source_id, g.ra, g.dec, g.phot_g_mean_mag,
-               g.phot_bp_mean_mag, g.phot_rp_mean_mag, g.bp_rp,
-               g.phot_variable_flag,
-               s.v_jkc_mag, s.b_jkc_mag, s.r_jkc_mag
+        SELECT g.source_id, g.ra, g.dec, g.ref_epoch, g.pmra, g.pmdec,
+               g.phot_g_mean_mag, g.phot_bp_mean_mag, g.phot_rp_mean_mag, g.bp_rp,
+               g.phot_variable_flag, {photometry}
         FROM gaiadr3.gaia_source AS g
         LEFT OUTER JOIN gaiadr3.synthetic_photometry_gspc AS s
             ON g.source_id = s.source_id
@@ -50,7 +50,7 @@ def _cone_query(ra, dec, radius, gmag_limit):
 
 
 def _fetch_cone(ra, dec, radius, gmag_limit):
-    """Run a single Gaia cone search. Fresh client per call for thread safety."""
+    """Query the actual Gaia TAP service through astroquery, without a row cap."""
     from astroquery.gaia import GaiaClass
 
     gaia = GaiaClass()
@@ -77,9 +77,9 @@ def _tile_centers(center, half_size_deg, n_tiles):
     return centers, cell
 
 
-def fetch_gaia_mosaic(
+def fetch_gaia_catalogue(
     center, cache_path, half_size_deg=1.5, n_tiles=1, gmag_limit=17.0,
-    max_workers=5, overwrite=False, attempts=4,
+    max_workers=5, overwrite=False, attempts=4, epoch=None,
 ):
     """Build (and cache) an oversized Gaia catalogue by tiling a box.
 
@@ -95,8 +95,8 @@ def fetch_gaia_mosaic(
 
     Parameters
     ----------
-    center : tuple of float
-        Field centre ``(ra, dec)`` in degrees.
+    center : SkyCoord or tuple of float
+        Scalar field centre, or ``(ra, dec)`` in degrees.
     cache_path : path-like
         ECSV cache for the full catalogue.
     half_size_deg : float
@@ -105,6 +105,13 @@ def fetch_gaia_mosaic(
         Tiles per axis. Keep at 1 unless the box is large: Gaia TAP is unreliable
         under concurrent jobs, and a single cone is both faster and safer.
     """
+    centre = center.icrs if isinstance(center, SkyCoord) else SkyCoord(
+        *center, unit=u.deg, frame="icrs")
+    if not centre.isscalar or not 0 < half_size_deg < 90 or n_tiles < 1:
+        raise ValueError("a scalar centre, positive half-size <90 deg and n_tiles>=1 are required")
+    if not np.isfinite(gmag_limit):
+        raise ValueError("gmag_limit must be finite")
+    center = (float(centre.ra.deg), float(centre.dec.deg))
     cache_path = Path(cache_path)
     if cache_path.exists() and not overwrite:
         return Table.read(cache_path)
@@ -121,14 +128,39 @@ def fetch_gaia_mosaic(
                     ex.map(lambda c: _fetch_cone(c[0], c[1], radius, gmag_limit), centers)
                 )
             catalogue = unique(vstack(tables, metadata_conflicts="silent"), keys="source_id")
+            for band in GSPC_BANDS:
+                mag = f"{band}_mag"
+                if mag not in catalogue.colnames:
+                    continue
+                values = np.asarray(catalogue[mag], float)
+                mask = np.ma.getmaskarray(catalogue[mag]) | ~np.isfinite(values)
+                catalogue[mag] = MaskedColumn(values, mask=mask, unit=u.mag)
+                flux, error = f"{band}_flux", f"{band}_flux_error"
+                if flux in catalogue.colnames and error in catalogue.colnames:
+                    f = np.asarray(catalogue[flux], float)
+                    e = np.asarray(catalogue[error], float)
+                    invalid = mask | np.ma.getmaskarray(catalogue[flux]) \
+                        | np.ma.getmaskarray(catalogue[error]) \
+                        | ~np.isfinite(f) | ~np.isfinite(e) | (f <= 0) | (e < 0)
+                    with np.errstate(invalid="ignore", divide="ignore"):
+                        sigma = (2.5 / np.log(10)) * e / f
+                    catalogue[f"{band}_mag_error"] = MaskedColumn(
+                        sigma, mask=invalid, unit=u.mag)
+            catalogue.meta.update(catalogue_source="Gaia DR3 TAP GSPC", epoch=2016.0,
+                                  catalogue_schema=2, query_ra=center[0], query_dec=center[1],
+                                  query_half_size_deg=half_size_deg, query_gmag_limit=gmag_limit)
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            catalogue.write(cache_path, overwrite=True)
+            catalogue.write(cache_path, format="ascii.ecsv", overwrite=True)
             return catalogue
         except Exception as exc:  # transient TAP truncation / dropped connection
             last = exc
             if attempt < attempts - 1:
                 time.sleep(5 * (attempt + 1))
     raise last
+
+
+# Compatibility name: the result is a catalogue, even for a single untiled query.
+fetch_gaia_mosaic = fetch_gaia_catalogue
 
 
 def load_catalogue(cache_path):
@@ -144,9 +176,8 @@ def sources_in_frame(catalogue, wcs, frame, margin=0.0):
     from the frame data, so both FITS layouts work.
     """
     ny, nx = frame.shape
-    x, y = wcs.world_to_pixel_values(
-        np.asarray(catalogue["ra"]), np.asarray(catalogue["dec"])
-    )
+    coordinates = SkyCoord(catalogue["ra"], catalogue["dec"], unit=u.deg, frame="icrs")
+    x, y = wcs.world_to_pixel(coordinates)
     inside = (x >= -margin) & (x < nx + margin) & (y >= -margin) & (y < ny + margin)
     return catalogue[inside]
 
@@ -163,11 +194,9 @@ def crossmatch_table(sources, wcs, catalogue, tol_arcsec=2.0, columns=None):
     including where the matched source itself lacks the value (e.g. no synthetic V),
     so a non-masked ``v_jkc_mag`` always means a usable match. Returns a new table.
     """
-    ra, dec = wcs.all_pix2world(np.asarray(sources["x"]), np.asarray(sources["y"]), 0)
-    det = SkyCoord(ra * u.deg, dec * u.deg)
-    cat = SkyCoord(
-        np.asarray(catalogue["ra"]) * u.deg, np.asarray(catalogue["dec"]) * u.deg
-    )
+    det = wcs.pixel_to_world(np.asarray(sources["x"]), np.asarray(sources["y"])).icrs
+    ra, dec = det.ra.deg, det.dec.deg
+    cat = SkyCoord(catalogue["ra"], catalogue["dec"], unit=u.deg, frame="icrs")
     idx, d2d, _ = det.match_to_catalog_sky(cat)
     unmatched = d2d.arcsec >= tol_arcsec
 
@@ -179,7 +208,7 @@ def crossmatch_table(sources, wcs, catalogue, tol_arcsec=2.0, columns=None):
         if col not in catalogue.colnames:
             continue
         name = {"ra": "cat_ra", "dec": "cat_dec"}.get(col, col)
-        values = np.ma.getdata(catalogue[col])[idx]
-        mask = unmatched | np.ma.getmaskarray(catalogue[col])[idx]
+        values = catalogue[col][idx]
+        mask = unmatched | np.ma.getmaskarray(values)
         out[name] = MaskedColumn(values, mask=mask)
     return out

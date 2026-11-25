@@ -64,7 +64,7 @@ pip install "seestar-photometry[catalog]"
 ```
 
 ```python
-proj.fetch_catalogue()                                   # the sky this project needs
+proj.catalogue()     # default: direct Gaia TAP query cached as a field ECSV
 ```
 
 ```python
@@ -74,12 +74,9 @@ gaiadb.download(center=(186.68, 81.47), radius_deg=5)   # or an explicit cone
 gaiadb.download()                                        # or the whole 6.4 GB
 ```
 
-Prefer `Project.fetch_catalogue()` to calling `gaiadb.download()` with a radius you picked
-yourself. The radius that matters is `Project.catalogue_radius_deg` — 2.221° at the default
-`catalogue_half_deg`, reaching the corners of the box a whole night's dithering covers —
-not the field of view. Ask for a frame's worth and you get 11 HEALPix parts where the
-project wants 14, and the only symptom is `catalogue_backend_used()` quietly answering
-`"tap"`.
+For the optional all-sky dataset, download a cone at least as large as
+`Project.catalogue_radius_deg`, then set `catalogue_backend="local"`. Downloading only
+one frame's footprint can leave the dithered project field incomplete.
 
 The whole sky is published — 148,667,792 sources to V < 17.5 — but fetching per region is
 the point of the layout: it is partitioned into 12288 HEALPix tiles, so a few observing
@@ -93,15 +90,14 @@ It has its own cache location, so it can live on a different disk from the examp
 | `XDG_CACHE_HOME` / `LOCALAPPDATA` | the platform cache location |
 | otherwise | `~/.cache/seestar-photometry` |
 
-Nothing has to be configured to use it. `Project` defaults to
-`catalogue_backend="auto"`, which uses the local copy when it covers the field and falls
-back to a TAP query when it does not — so installing the download is the only step.
-Force one or the other with `catalogue_backend="local"` (raises rather than reaching the
-network, which is what you want on a machine that must not) or `"tap"`.
+`Project` defaults to `catalogue_backend="tap"`, which queries the Gaia database
+independently of this optional dataset. Select `"local"` to require the dataset without
+network fallback, or `"auto"` to use it only where coverage and requested columns permit.
+SDSS reference columns require TAP or a supplied enriched ECSV.
 
-It also carries proper motions, which the TAP query does not fetch at all. Gaia
-positions are J2016.0, and by 2026 a 100 mas/yr star has moved 1 arcsec — half the
-default match tolerance:
+Both backends carry proper motions. Gaia positions are J2016.0, and by 2026 a
+100 mas/yr star has moved 1 arcsec, half the default match tolerance:
+
 
 ```python
 Project(..., epoch=2026.4)      # propagate to the observing season
