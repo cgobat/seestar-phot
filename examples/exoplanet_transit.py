@@ -29,9 +29,9 @@ TARGET = Target(
 DATA_ROOTS = [r"D:\seestar_data\hd189733\stacks"]
 WORK_DIR = r"D:\work\seestar_photometry\hd189733"
 
-# The catalogue box must cover the whole dithered area, not one FOV. 1.5 deg half-size
+# The catalog box must cover the whole dithered area, not one FOV. 1.5 deg half-size
 # comfortably covers a night's dithering; enlarge only if the pointing wandered.
-CATALOGUE_HALF_DEG = 1.5
+CATALOG_HALF_DEG = 1.5
 
 # Comparison-ensemble cuts. Start here and tighten based on lc_comparison_grid.
 COMP_DMAG = 1.0          # within +-1 mag of the target
@@ -45,7 +45,7 @@ def main():
         target=TARGET,
         source=LocalTree(roots=DATA_ROOTS),
         work_dir=WORK_DIR,
-        catalogue_half_deg=CATALOGUE_HALF_DEG,
+        catalog_half_deg=CATALOG_HALF_DEG,
         solver="astap",
     )
 
@@ -67,7 +67,7 @@ def main():
         print("  more than half the night is marginal -- check frames_zp_vs_time.png "
               "for cloud before trusting the light curve")
 
-    # Stage 3: forced photometry of every catalogue source.
+    # Stage 3: forced photometry of every catalog source.
     stars, meas = pipeline.build_measurements(proj)
 
     # If you did not set Target.source_id, check the flagged target is really yours:

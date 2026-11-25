@@ -1,4 +1,4 @@
-"""The offline reference catalogue: partitioning, cone queries, and the masking contract.
+"""The offline reference catalog: partitioning, cone queries, and the masking contract.
 
 Everything here runs on a synthetic dataset written into ``tmp_path``, so no download and
 no network is involved. What is being tested is the *plumbing* -- that a cone returns
@@ -24,8 +24,8 @@ from seestar_photometry import gaiadb  # noqa: E402
 FIELD = (186.6821, 81.474)          # MW Cam: near the pole, where RA arithmetic breaks
 
 
-def synthetic_catalogue(n=600, center=FIELD, radius_deg=2.0, seed=11):
-    """A catalogue in the :mod:`gaiadb` schema, scattered over a cap.
+def synthetic_catalog(n=600, center=FIELD, radius_deg=2.0, seed=11):
+    """A catalog in the :mod:`gaiadb` schema, scattered over a cap.
 
     ``source_id`` is built the way Gaia builds it -- the level-12 HEALPix index shifted
     up by 35 bits -- so the partitioning under test is exercised for real rather than
@@ -86,21 +86,21 @@ def synthetic_catalogue(n=600, center=FIELD, radius_deg=2.0, seed=11):
 
 
 @pytest.fixture(scope="module")
-def catalogue():
-    return synthetic_catalogue()
+def catalog():
+    return synthetic_catalog()
 
 
 @pytest.fixture(scope="module")
-def dataset(tmp_path_factory, catalogue):
+def dataset(tmp_path_factory, catalog):
     """A written dataset, and the table it was written from."""
     directory = tmp_path_factory.mktemp("gaiadb")
-    gaiadb.write_dataset(catalogue, directory)
+    gaiadb.write_dataset(catalog, directory)
     return directory
 
 
 # --- the source_id bit trick -----------------------------------------------------------
 
-def test_hpx_agrees_with_a_real_healpix_implementation(catalogue):
+def test_hpx_agrees_with_a_real_healpix_implementation(catalog):
     """``source_id >> 51`` must be the level-4 pixel, or every part is misfiled.
 
     This is the one piece of the layout that is pure bit arithmetic with no library
@@ -111,9 +111,9 @@ def test_hpx_agrees_with_a_real_healpix_implementation(catalogue):
 
     expected = HEALPix(nside=2 ** gaiadb.HPX_LEVEL, order="nested",
                        frame="icrs").lonlat_to_healpix(
-        np.asarray(catalogue["ra"]) * u.deg, np.asarray(catalogue["dec"]) * u.deg
+        np.asarray(catalog["ra"]) * u.deg, np.asarray(catalog["dec"]) * u.deg
     )
-    assert np.array_equal(gaiadb.hpx_of(catalogue["source_id"]), np.asarray(expected))
+    assert np.array_equal(gaiadb.hpx_of(catalog["source_id"]), np.asarray(expected))
 
 
 def test_separation_agrees_with_astropy():
@@ -132,11 +132,11 @@ def test_separation_agrees_with_astropy():
 # --- cone queries ------------------------------------------------------------------------
 
 @pytest.mark.parametrize("radius", [0.2, 0.5, 1.0, 2.0])
-def test_cone_returns_exactly_what_a_brute_force_cut_would(dataset, catalogue, radius):
+def test_cone_returns_exactly_what_a_brute_force_cut_would(dataset, catalog, radius):
     got = gaiadb.cone(FIELD, radius, directory=dataset)
-    sep = gaiadb.separation_deg(FIELD[0], FIELD[1], catalogue["ra"], catalogue["dec"])
+    sep = gaiadb.separation_deg(FIELD[0], FIELD[1], catalog["ra"], catalog["dec"])
     assert sorted(np.asarray(got["source_id"])) == sorted(
-        np.asarray(catalogue["source_id"])[sep <= radius]
+        np.asarray(catalog["source_id"])[sep <= radius]
     )
 
 
@@ -149,7 +149,7 @@ def test_cone_smaller_than_a_pixel_still_resolves(dataset):
 def test_cone_works_across_the_ra_meridian(tmp_path):
     """RA 0/360 is where a naive min/max box filter silently returns half the sky."""
     center = (0.3, 12.0)
-    table = synthetic_catalogue(n=400, center=center, radius_deg=1.5, seed=5)
+    table = synthetic_catalog(n=400, center=center, radius_deg=1.5, seed=5)
     gaiadb.write_dataset(table, tmp_path)
 
     got = gaiadb.cone(center, 1.0, directory=tmp_path)
@@ -162,7 +162,7 @@ def test_cone_works_across_the_ra_meridian(tmp_path):
 
 def test_cone_works_at_the_pole(tmp_path):
     center = (120.0, 89.5)
-    table = synthetic_catalogue(n=400, center=center, radius_deg=1.5, seed=6)
+    table = synthetic_catalog(n=400, center=center, radius_deg=1.5, seed=6)
     gaiadb.write_dataset(table, tmp_path)
 
     got = gaiadb.cone(center, 1.0, directory=tmp_path)
@@ -172,24 +172,24 @@ def test_cone_works_at_the_pole(tmp_path):
 
 def test_cone_says_how_to_get_missing_parts(tmp_path):
     """The usual cause is an un-fetched region, so the error must name the fix."""
-    gaiadb.write_dataset(synthetic_catalogue(n=50), tmp_path)
+    gaiadb.write_dataset(synthetic_catalog(n=50), tmp_path)
     with pytest.raises(FileNotFoundError, match="gaiadb.download"):
         gaiadb.cone((10.0, -30.0), 0.5, directory=tmp_path)
 
 
 # --- the schema contract ------------------------------------------------------------------
 
-def test_every_column_survives_the_round_trip(dataset, catalogue):
+def test_every_column_survives_the_round_trip(dataset, catalog):
     got = gaiadb.cone(FIELD, 3.0, directory=dataset)
     assert list(got.colnames) == list(gaiadb.COLUMNS)
-    assert len(got) == len(catalogue)
+    assert len(got) == len(catalog)
 
 
-def test_nulls_come_back_masked_and_not_as_nan(dataset, catalogue):
+def test_nulls_come_back_masked_and_not_as_nan(dataset, catalog):
     """The trap this whole module has to avoid. See the module docstring."""
     got = gaiadb.cone(FIELD, 3.0, directory=dataset)
     got.sort("source_id")
-    reference = catalogue.copy()
+    reference = catalog.copy()
     reference.sort("source_id")
 
     for name in ("c_star", "ruwe", "teff_gspphot", "ipd_frac_multi_peak"):
@@ -225,16 +225,16 @@ def test_dtypes_and_units_match_the_schema(dataset):
     assert str(got["v_jkc_mag"].unit) == "mag"
 
 
-def test_writing_without_a_position_is_an_error(tmp_path, catalogue):
+def test_writing_without_a_position_is_an_error(tmp_path, catalog):
     """Positions and identity are the spine; nothing works without them."""
     for column in ("source_id", "ra", "dec"):
-        incomplete = catalogue.copy()
+        incomplete = catalog.copy()
         incomplete.remove_column(column)
         with pytest.raises((ValueError, KeyError), match=column):
             gaiadb.write_dataset(incomplete, tmp_path)
 
 
-def test_a_column_the_dataset_lacks_comes_back_masked(tmp_path, catalogue):
+def test_a_column_the_dataset_lacks_comes_back_masked(tmp_path, catalog):
     """A dataset may carry only part of the schema, and must say so.
 
     The columns come from two Gaia tables and the one holding positions is 790 GB in
@@ -242,7 +242,7 @@ def test_a_column_the_dataset_lacks_comes_back_masked(tmp_path, catalogue):
     not a degenerate one. Callers still see every column -- the absent ones are entirely
     masked, which is what code testing ``np.ma.getmaskarray`` should conclude.
     """
-    partial = catalogue.copy()
+    partial = catalog.copy()
     for column in ("ruwe", "teff_gspphot", "phot_variable_flag"):
         partial.remove_column(column)
     meta = gaiadb.write_dataset(partial, tmp_path)
@@ -258,26 +258,26 @@ def test_a_column_the_dataset_lacks_comes_back_masked(tmp_path, catalogue):
     assert not np.ma.getmaskarray(got["v_jkc_mag"]).all()
 
 
-def test_parts_can_be_written_one_at_a_time_and_indexed_later(tmp_path, catalogue):
+def test_parts_can_be_written_one_at_a_time_and_indexed_later(tmp_path, catalog):
     """An all-sky build is 12288 parts and has to survive being interrupted."""
-    pixels = np.unique(gaiadb.hpx_of(catalogue["source_id"]))
+    pixels = np.unique(gaiadb.hpx_of(catalog["source_id"]))
     for pixel in pixels:
-        rows = catalogue[gaiadb.hpx_of(catalogue["source_id"]) == pixel]
+        rows = catalog[gaiadb.hpx_of(catalog["source_id"]) == pixel]
         gaiadb.write_part(rows, tmp_path)
     assert gaiadb.manifest(tmp_path) is None, "no manifest until it is finalised"
 
     meta = gaiadb.finalise_manifest(tmp_path)
-    assert meta["rows"] == len(catalogue)
+    assert meta["rows"] == len(catalog)
     assert set(meta["parts"]) == {str(int(p)) for p in pixels}
-    assert len(gaiadb.cone(FIELD, 3.0, directory=tmp_path)) == len(catalogue)
+    assert len(gaiadb.cone(FIELD, 3.0, directory=tmp_path)) == len(catalog)
 
 
-def test_write_part_refuses_mixed_pixels(tmp_path, catalogue):
+def test_write_part_refuses_mixed_pixels(tmp_path, catalog):
     with pytest.raises(ValueError, match="one HEALPix pixel"):
-        gaiadb.write_part(catalogue, tmp_path)
+        gaiadb.write_part(catalog, tmp_path)
 
 
-def test_duplicate_source_ids_are_refused(tmp_path, catalogue):
+def test_duplicate_source_ids_are_refused(tmp_path, catalog):
     """The check that would have caught a real corruption, so it is not sampled.
 
     A build tool laundered identifiers through float64. A Gaia ``source_id`` needs 61
@@ -286,8 +286,8 @@ def test_duplicate_source_ids_are_refused(tmp_path, catalogue):
     a row's identity. Everything downstream still looked plausible, which is exactly why
     this has to fail at write time.
     """
-    pixel = int(gaiadb.hpx_of(catalogue["source_id"])[0])
-    rows = catalogue[gaiadb.hpx_of(catalogue["source_id"]) == pixel]
+    pixel = int(gaiadb.hpx_of(catalog["source_id"])[0])
+    rows = catalog[gaiadb.hpx_of(catalog["source_id"]) == pixel]
     assert len(rows) > 2
     collided = rows.copy()
     collided["source_id"][1] = collided["source_id"][0]
@@ -297,12 +297,12 @@ def test_duplicate_source_ids_are_refused(tmp_path, catalogue):
     gaiadb.write_part(rows, tmp_path)      # the clean rows still write
 
 
-def test_source_ids_survive_the_write_exactly(tmp_path, catalogue):
+def test_source_ids_survive_the_write_exactly(tmp_path, catalog):
     """No rounding anywhere between the input table and the part on disk."""
-    gaiadb.write_dataset(catalogue, tmp_path)
+    gaiadb.write_dataset(catalog, tmp_path)
     got = gaiadb.cone(FIELD, 3.0, directory=tmp_path)
     assert set(np.asarray(got["source_id"]).tolist()) == \
-        set(np.asarray(catalogue["source_id"]).tolist())
+        set(np.asarray(catalog["source_id"]).tolist())
 
 
 # --- filters --------------------------------------------------------------------------------
@@ -316,9 +316,9 @@ def test_magnitude_limits_cut_on_the_right_column(dataset):
     assert len(bright_g) < len(bright_v)
 
 
-def test_a_source_with_no_magnitude_fails_the_cut(tmp_path, catalogue):
+def test_a_source_with_no_magnitude_fails_the_cut(tmp_path, catalog):
     """Rather than passing it: an uncalibratable source is not a bright one."""
-    table = catalogue.copy()
+    table = catalog.copy()
     table["v_jkc_mag"] = MaskedColumn(
         np.asarray(table["v_jkc_mag"]), mask=np.ones(len(table), dtype=bool)
     )
@@ -328,8 +328,8 @@ def test_a_source_with_no_magnitude_fails_the_cut(tmp_path, catalogue):
 
 # --- epoch propagation -------------------------------------------------------------------
 
-def test_proper_motion_moves_a_star_by_the_right_amount(tmp_path, catalogue):
-    table = catalogue.copy()
+def test_proper_motion_moves_a_star_by_the_right_amount(tmp_path, catalog):
+    table = catalog.copy()
     table["pmra"] = np.full(len(table), 1000.0, dtype="float32")   # mas/yr, a fast star
     table["pmdec"] = np.full(len(table), -750.0, dtype="float32")
     gaiadb.write_dataset(table, tmp_path)
@@ -348,19 +348,19 @@ def test_proper_motion_moves_a_star_by_the_right_amount(tmp_path, catalogue):
     assert ten_years.meta["epoch"] == gaiadb.REF_EPOCH + 10.0
 
 
-def test_propagated_positions_are_still_positions(tmp_path, catalogue):
+def test_propagated_positions_are_still_positions(tmp_path, catalog):
     """Epoch propagation must not relabel ``ra``/``dec`` as proper motions.
 
     Filling a masked ``pmra`` returns a *Column* that keeps its ``mas / yr``, and the
-    arithmetic carried that unit onto the result, so a propagated catalogue described
+    arithmetic carried that unit onto the result, so a propagated catalog described
     its positions as proper motions. Every number was right, which is why it survived:
-    the only symptom was that building a ``SkyCoord`` from the catalogue raised. That is
+    the only symptom was that building a ``SkyCoord`` from the catalog raised. That is
     the whole cross-match path, so it is asserted here rather than left to be rediscovered.
     """
     import astropy.units as u
     from astropy.coordinates import SkyCoord
 
-    table = catalogue.copy()
+    table = catalog.copy()
     table["pmra"] = np.full(len(table), 1000.0, dtype="float32")
     table["pmdec"] = np.full(len(table), -750.0, dtype="float32")
     gaiadb.write_dataset(table, tmp_path)
@@ -372,10 +372,10 @@ def test_propagated_positions_are_still_positions(tmp_path, catalogue):
     SkyCoord(moved["ra"], moved["dec"])
 
 
-def test_no_epoch_leaves_positions_at_the_gaia_epoch(dataset, catalogue):
+def test_no_epoch_leaves_positions_at_the_gaia_epoch(dataset, catalog):
     got = gaiadb.cone(FIELD, 3.0, directory=dataset)
     got.sort("source_id")
-    reference = catalogue.copy()
+    reference = catalog.copy()
     reference.sort("source_id")
     assert np.allclose(got["ra"], reference["ra"])
     assert got.meta["epoch"] == gaiadb.REF_EPOCH
@@ -401,7 +401,7 @@ def test_covers_answers_without_touching_the_network(dataset):
     assert not gaiadb.covers((10.0, -30.0), 0.5, directory=dataset)
 
 
-def test_covers_is_false_for_a_region_listed_but_not_fetched(tmp_path, catalogue):
+def test_covers_is_false_for_a_region_listed_but_not_fetched(tmp_path, catalog):
     """The partial-download case: the manifest knows about sky that is not here yet.
 
     Simulated by writing the dataset, recording its manifest, then deleting a part --
@@ -409,7 +409,7 @@ def test_covers_is_false_for_a_region_listed_but_not_fetched(tmp_path, catalogue
     """
     import json
 
-    gaiadb.write_dataset(catalogue, tmp_path)
+    gaiadb.write_dataset(catalog, tmp_path)
     assert gaiadb.covers(FIELD, 0.5, directory=tmp_path)
 
     meta = gaiadb.manifest(tmp_path)
@@ -426,7 +426,7 @@ def test_covers_is_false_for_an_empty_directory(tmp_path):
 
 def test_a_partial_dataset_is_valid(tmp_path):
     """Fetching one region must produce something usable, not a broken dataset."""
-    gaiadb.write_dataset(synthetic_catalogue(n=200, radius_deg=0.5), tmp_path)
+    gaiadb.write_dataset(synthetic_catalog(n=200, radius_deg=0.5), tmp_path)
     meta = gaiadb.manifest(tmp_path)
     assert 0 < len(meta["parts"]) < gaiadb.N_PARTS
     assert len(gaiadb.cone(FIELD, 0.4, directory=tmp_path)) > 0
@@ -448,65 +448,67 @@ def _project(tmp_path, **kwargs):
 
 def test_auto_backend_falls_back_to_tap_without_the_download(tmp_path, monkeypatch):
     monkeypatch.setenv("SEESTAR_GAIA_DATA", str(tmp_path / "empty"))
-    assert _project(tmp_path).catalogue_backend_used() == "tap"
+    assert _project(tmp_path, catalog_backend="auto").catalog_backend_used() == "tap"
 
 
 def test_auto_backend_uses_the_download_when_it_covers_the_field(
-        tmp_path, monkeypatch, catalogue):
+        tmp_path, monkeypatch, catalog):
     """Installing the dataset is the only step needed to stop using the network."""
     root = tmp_path / "cache"
-    gaiadb.write_dataset(catalogue, root / gaiadb.DATASET)
+    gaiadb.write_dataset(catalog, root / gaiadb.DATASET)
     monkeypatch.setenv("SEESTAR_GAIA_DATA", str(root))
-    assert _project(tmp_path).catalogue_backend_used() == "local"
+    assert _project(tmp_path, catalog_backend="auto").catalog_backend_used() == "local"
 
 
 def test_backend_can_be_forced(tmp_path, monkeypatch):
     monkeypatch.setenv("SEESTAR_GAIA_DATA", str(tmp_path / "empty"))
-    assert _project(tmp_path, catalogue_backend="local").catalogue_backend_used() \
+    assert _project(tmp_path, catalog_backend="local").catalog_backend_used() \
         == "local"
 
 
 def test_local_backend_writes_the_same_cache_everything_else_reads(
-        tmp_path, monkeypatch, catalogue):
+        tmp_path, monkeypatch, catalog):
     """Downstream code must not be able to tell which backend ran."""
     from seestar_photometry import catalogs
 
     root = tmp_path / "cache"
-    gaiadb.write_dataset(catalogue, root / gaiadb.DATASET)
+    gaiadb.write_dataset(catalog, root / gaiadb.DATASET)
     monkeypatch.setenv("SEESTAR_GAIA_DATA", str(root))
 
-    proj = _project(tmp_path, catalogue_backend="local", gmag_limit=15.0)
-    built = proj.catalogue()
-    assert proj.catalogue_path.exists()
+    proj = _project(tmp_path, catalog_backend="local", gmag_limit=15.0)
+    built = proj.catalog()
+    assert proj.catalog_path.exists()
     assert np.ma.filled(built["phot_g_mean_mag"], -99).max() < 15.0
 
     # Read back through the normal path: the ECSV must round-trip, masks included.
-    reloaded = catalogs.load_catalogue(proj.catalogue_path)
+    reloaded = catalogs.load_catalog(proj.catalog_path)
     assert list(reloaded.colnames) == list(gaiadb.COLUMNS)
     assert np.ma.getmaskarray(reloaded["ruwe"]).any()
     assert len(reloaded) == len(built)
 
 
-def test_project_catalogue_radius_covers_the_box(tmp_path):
+def test_project_catalog_radius_covers_the_box(tmp_path):
     """The local cone and the TAP box must cover the same sky, or they disagree."""
-    proj = _project(tmp_path, catalogue_half_deg=1.5)
+    proj = _project(tmp_path, catalog_half_deg=1.5)
     # The corner of the box is half_deg * sqrt(2) away; the radius must reach it.
-    assert proj.catalogue_radius_deg >= 1.5 * 2 ** 0.5
+    assert proj.catalog_radius_deg >= 1.5 * 2 ** 0.5
 
 
-def test_fetch_catalogue_asks_for_the_radius_the_project_needs(tmp_path, monkeypatch):
-    """A frame's worth of sky is not enough, and getting it wrong is silent.
+def test_default_backend_is_direct_tap(tmp_path):
+    assert _project(tmp_path).catalog_backend_used() == "tap"
 
-    Measured on the real deployment: a 1.5 degree fetch pulls 11 HEALPix parts and
-    leaves ``catalogue_backend_used()`` answering "tap"; the project needs 14.
-    """
-    seen = {}
-    monkeypatch.setattr(gaiadb, "download",
-                        lambda **kw: seen.update(kw) or tmp_path)
 
-    proj = _project(tmp_path, catalogue_half_deg=1.5)
-    proj.fetch_catalogue(quiet=True)
-    assert seen["radius_deg"] == proj.catalogue_radius_deg
-    assert seen["center"] == proj.target.radec
-    assert len(gaiadb.parts_in_cone(proj.target.radec, proj.catalogue_radius_deg)) > \
-        len(gaiadb.parts_in_cone(proj.target.radec, 1.5))
+def test_fetch_catalog_uses_the_configured_direct_query(tmp_path, monkeypatch, catalog):
+    from seestar_photometry import catalogs
+
+    called = {}
+
+    def fetch(center, cache_path, **kwargs):
+        called.update(kwargs)
+        return catalog
+
+    monkeypatch.setattr(catalogs, "fetch_gaia_catalog", fetch)
+    proj = _project(tmp_path, catalog_half_deg=14)
+    proj.fetch_catalog()
+    assert called["half_size_deg"] == 14
+    assert proj.catalog_backend_used() == "tap"

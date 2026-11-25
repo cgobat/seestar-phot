@@ -6,12 +6,12 @@ the CrowdSky webspace; the third is a GitHub release asset.
 | What | Size | Where | Built by |
 |---|---|---|---|
 | Example data | 18 MB | GitHub release `example-data-v1` | `tools/build_example_data.py` |
-| Gaia catalogue | 6.35 GB, all sky | `crowdsky.univie.ac.at/seestar_assets/gaia-seestar-dr3-v2/` | `build_gaia_allsky.py` + `build_gaia_s50.py` |
+| Gaia catalog | 6.35 GB, all sky | `crowdsky.univie.ac.at/seestar_assets/gaia-seestar-dr3-v2/` | `build_gaia_allsky.py` + `build_gaia_s50.py` |
 | ASTAP mirror | 106 MB | `crowdsky.univie.ac.at/seestar_assets/astap/` | `tools/build_astap_mirror.py` |
 
 The CrowdSky webspace is mounted over the VPN at `Z:\crowdskyo92\html\seestar_assets`,
 which maps to `https://crowdsky.univie.ac.at/seestar_assets/`. Deploying is a file copy;
-there is no rsync-over-ssh step. **50 GB total**, so the 6.35 GB catalogue is the one asset
+there is no rsync-over-ssh step. **50 GB total**, so the 6.35 GB catalog is the one asset
 whose size is worth thinking about before adding another.
 
 > **The share refuses attribute and timestamp writes.** A plain `robocopy` fails on every
@@ -92,30 +92,30 @@ When ASTAP releases a new version, bump `astap.VERSION` as well. The cache direc
 keyed on it, so a bump is what makes clients pick up the new binary instead of the one they
 already have.
 
-## Gaia catalogue
+## Gaia catalog
 
-`build_gaia_catalogue.py` queries one region at a time and merges regions into a single
+`build_gaia_catalog.py` queries one region at a time and merges regions into a single
 directory, so a dataset is built by running it repeatedly:
 
 ```bash
-uv run python tools/build_gaia_catalogue.py --ra 186.68 --dec 81.47 --radius 3 --out build/gaia
+uv run python tools/build_gaia_catalog.py --ra 186.68 --dec 81.47 --radius 3 --out build/gaia
 ```
 
 Copy the result into `Z:\crowdskyo92\html\seestar_assets\` and it is live.
 
-**Fetch the radius the project needs, not the frame's.** `Project.catalogue_radius_deg`
-(2.221 degrees at the default `catalogue_half_deg=1.5`) reaches the corners of the cached
+**Fetch the radius the project needs, not the frame's.** `Project.catalog_radius_deg`
+(2.221 degrees at the default `catalog_half_deg=1.5`) reaches the corners of the cached
 box, and the cached box covers a whole night's dithering. Asking for 1.5 degrees pulls 11
 HEALPix parts where the project wants 14, and the only symptom is
-`catalogue_backend_used()` quietly answering `"tap"`. `Project.fetch_catalogue()` gets this
+`catalog_backend_used()` quietly answering `"tap"`. `Project.fetch_catalog()` gets this
 right, so prefer it:
 
 ```python
-proj.fetch_catalogue()          # not gaiadb.download(radius_deg=<fov>)
+proj.fetch_catalog()          # not gaiadb.download(radius_deg=<fov>)
 ```
 
 **Currently deployed: the full sky, as `v2`.** 12288 parts, 148,667,792 rows, 6.35 GB. It
-replaces nothing -- until August 2026 the server carried no Gaia catalogue at all, only the
+replaces nothing -- until August 2026 the server carried no Gaia catalog at all, only the
 ASTAP mirror, so every client was silently falling back to TAP. A region-only build (MW Cam,
 26 parts, 2.5 MB) existed locally and was never uploaded.
 
@@ -127,8 +127,8 @@ without being told anything.
 `tools/build_gaia_allsky.py`. The obvious route does not work, and the reasons are worth
 keeping because both are counter-intuitive.
 
-**Bulk-downloading everything is not viable.** The catalogue needs two Gaia tables.
-`synthetic_photometry_gspc` has the synthetic V and the colour and bulk-downloads as 44
+**Bulk-downloading everything is not viable.** The catalog needs two Gaia tables.
+`synthetic_photometry_gspc` has the synthetic V and the color and bulk-downloads as 44
 files totalling ~42 GB. `gaia_source` has the positions and proper motions and
 bulk-downloads as 3387 files totalling **~790 GB** -- 152 columns for 1.8 billion rows, to
 keep 6 columns for the 220 million that have synthetic photometry. And neither table alone
@@ -167,7 +167,7 @@ The one that costs something is `phot_variable_flag`: `fit_zeropoint` and
 `select_comparisons` both use it to drop known variables, and without it they drop none.
 Both guard on the column being present, so nothing breaks. It could be recovered
 cheaply -- DR3 has ~10.5M variable sources and only their `source_id` is needed -- which is
-the obvious next improvement. `bp_rp` is not a loss: the comparison colour cut falls back
+the obvious next improvement. `bp_rp` is not a loss: the comparison color cut falls back
 to B-R, which this build does have.
 
 Bump `gaiadb.DATA_VERSION` when the schema or the row selection changes; bump
@@ -179,7 +179,7 @@ sit side by side on the server during a migration.
 `tools/build_gaia_s50.py` adds `r_s50_mag` / `g_s50_mag` / `b_s50_mag` and their errors by
 integrating Gaia DR3 XP spectra through the Seestar's fitted passbands
 (`tools/bayer_passbands.ecsv`, copied from `photometry-adventures-2`, B red tail ×1.15).
-Calibrating a Bayer plane against its own band removes the zero point's colour term instead
+Calibrating a Bayer plane against its own band removes the zero point's color term instead
 of fitting it — measured on 57 fifteen-minute 20 Cep stacks, G +0.054 → −0.002, R −0.132 →
 −0.002, B +0.548 → ≈0 mag/mag, and the B-plane calibrator rms fell from 347 to 104 mmag.
 This is the `v1` → `v2` schema change, so **`v1` must stay on the server until `v2` is
@@ -197,7 +197,7 @@ uv run python tools/build_gaia_s50.py --stage all --work D:/tmp/xp \
 
 **The spectra stop at G = 15.0.** ESA's bulk `xp_sampled_mean_spectrum` product is the
 bright subset of the XP population, not all of it. Measured over eleven fully covered
-HEALPix parts: coverage of the V < 17.5 catalogue is **100% below G = 15.0 and exactly 0%
+HEALPix parts: coverage of the V < 17.5 catalog is **100% below G = 15.0 and exactly 0%
 above it**, which is 23.03% of all rows — 37% in a high-latitude part, 17% in the Galactic
 plane, where the same G cut takes a smaller share. The other three quarters get masked
 columns and keep calibrating against `v_jkc_mag`. Full depth would mean

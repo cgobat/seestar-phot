@@ -12,11 +12,11 @@
 # - {name: G_os08b10, datatype: float64}
 # - {name: B_os08b10, datatype: float64}
 # meta: !!omap
-# - comments: ['Sensor quantum efficiency, digitised from datasheet plots by colour-masking,', 'as a fraction (not percent), resampled
+# - comments: ['Sensor quantum efficiency, digitised from datasheet plots by color-masking,', 'as a fraction (not percent), resampled
 #       onto a common 330-1020 nm, 2 nm grid.', Values outside each figure's plotted range are held at the edge value., 'imx462: Sony
 #       IMX462, the S50. Digitised in photometry-adventures-2 first; kept here so all three units come from one code path.', 'imx585:
 #       Sony IMX585, the S30 Pro, from the ZWO ASI585 datasheet plot. The screenshot caught a mouse cursor over the green peak near 520
-#       nm; it occludes the curve rather than recolouring it, so it reads as a gap.', 'os08b10: OmniVision OS08B10, the S50 Pro. The grid
+#       nm; it occludes the curve rather than recoloring it, so it reads as a gap.', 'os08b10: OmniVision OS08B10, the S50 Pro. The grid
 #       was cleaned off this screenshot, so it is calibrated from the axis tick marks.', Built by tools/digitise_sensor_qe.py.]
 # schema: astropy-2.0
 wavelength_nm R_imx462 G_imx462 B_imx462 R_imx585 G_imx585 B_imx585 R_os08b10 G_os08b10 B_os08b10

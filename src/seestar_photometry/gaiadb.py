@@ -1,13 +1,13 @@
-"""The offline Gaia reference catalogue: a local copy of what the TAP query returns.
+"""The offline Gaia reference catalog: a local copy of what the TAP query returns.
 
-:mod:`catalogs` builds its per-field catalogue from a Gaia TAP query. That query is the
+:mod:`catalogs` builds its per-field catalog from a Gaia TAP query. That query is the
 least reliable step in the whole package -- it truncates under load, which is why
 :func:`catalogs.fetch_gaia_mosaic` retries four times and refuses to cache a partial
-result. This module removes it: given a local copy of the catalogue, building a field is
+result. This module removes it: given a local copy of the catalog, building a field is
 a file read, and the measurement path touches the network exactly never.
 
 It also makes :func:`astrometry.solve_local` possible. A plate solve against a local
-catalogue needs the catalogue to be *there* before the frame is solved, which a
+catalog needs the catalog to be *there* before the frame is solved, which a
 per-field TAP query cannot provide -- it is the same chicken-and-egg the on-board WCS
 was supposed to break.
 
@@ -30,7 +30,7 @@ more -- every extra float32 is half a gigabyte over the full sky. See ``COLUMNS`
 Six of them, ``r_s50_mag`` through ``b_s50_mag_err``, are not Gaia's: they are synthetic
 magnitudes in the Seestar's *own* R/G/B system, integrated from Gaia XP spectra through
 the fitted S50 passbands by ``tools/build_gaia_s50.py``. They exist only for the bright
-quarter of the catalogue, because ESA publishes sampled XP spectra down to G = 15.0 and
+quarter of the catalog, because ESA publishes sampled XP spectra down to G = 15.0 and
 no further, and are masked elsewhere.
 
 Layout
@@ -68,7 +68,7 @@ otherwise
     ``~/.cache/seestar-photometry``.
 
 The sibling of :func:`examples.data_dir`, with its own override so the 18 MB of example
-data and a multi-GB catalogue can live on different disks -- which at this size people
+data and a multi-GB catalog can live on different disks -- which at this size people
 do want.
 """
 
@@ -115,7 +115,7 @@ HPX_MAX_RADIUS = 1.91
 #: Pixel centres, computed once on first use. 12288 of them, so not worth recomputing.
 _CENTRES = None
 
-#: Epoch of the catalogue positions. Gaia DR3 is J2016.0 for every source.
+#: Epoch of the catalog positions. Gaia DR3 is J2016.0 for every source.
 REF_EPOCH = 2016.0
 
 #: Faint limit in synthetic V. See the module docstring.
@@ -140,7 +140,7 @@ MANIFEST = "MANIFEST.json"
 #:
 #: The six ``*_s50_mag`` columns are the Seestar's *own* photometric system, synthesised
 #: from Gaia XP spectra through the fitted S50 passbands (``tools/build_gaia_s50.py``).
-#: Calibrating a Bayer plane against its own band removes the zero point's colour term
+#: Calibrating a Bayer plane against its own band removes the zero point's color term
 #: rather than fitting it: measured on 57 fifteen-minute stacks, R -0.132 -> -0.002 and
 #: B +0.548 -> ~0 mag/mag. They are populated only where Gaia published a *sampled* XP
 #: spectrum, which is a hard G < 15.0 cut and 23.0% of the rows here; everywhere else
@@ -241,7 +241,7 @@ def separation_deg(ra0, dec0, ra, dec):
 # --- where the data lives --------------------------------------------------------------
 
 def cache_dir():
-    """Root directory the catalogue is cached under. Downloads nothing.
+    """Root directory the catalog is cached under. Downloads nothing.
 
     Honours ``SEESTAR_GAIA_DATA`` first, then the platform cache location.
     """
@@ -313,7 +313,7 @@ def covers(center, radius_deg, directory=None):
     it was built from, and is complete for its own region. A full dataset that has been
     partially fetched has the whole manifest, so a part listed there but absent locally
     is genuinely missing and this returns False -- which is what makes
-    ``catalogue_backend="auto"`` fall back to TAP for a field you have not fetched.
+    ``catalog_backend="auto"`` fall back to TAP for a field you have not fetched.
     """
     directory = Path(directory) if directory is not None else dataset_dir()
     meta = manifest(directory)
@@ -400,7 +400,7 @@ def read_part(path):
 
 def cone(center, radius_deg, directory=None, vmag_limit=None, gmag_limit=None,
          epoch=None):
-    """Every catalogue source within ``radius_deg`` of ``center``, as an astropy Table.
+    """Every catalog source within ``radius_deg`` of ``center``, as an astropy Table.
 
     A drop-in for the result of :func:`catalogs.fetch_gaia_mosaic`: same column names,
     same units, same masking convention, plus the extra columns in :data:`COLUMNS`.
@@ -451,31 +451,31 @@ def cone(center, radius_deg, directory=None, vmag_limit=None, gmag_limit=None,
         keep &= np.ma.filled(table["phot_g_mean_mag"], np.inf) < gmag_limit
     table = table[keep]
     table.meta["epoch"] = REF_EPOCH
-    table.meta["catalogue"] = DATASET
+    table.meta["catalog"] = DATASET
     if epoch is not None:
         table = propagate_epoch(table, epoch)
     return table
 
 
-def propagate_epoch(catalogue, epoch, ref_epoch=REF_EPOCH):
+def propagate_epoch(catalog, epoch, ref_epoch=REF_EPOCH):
     """Propagate angular coordinates through the common Astropy implementation."""
     from .catalogs import propagate_epoch as propagate
 
-    return propagate(catalogue, epoch, ref_epoch=ref_epoch)
+    return propagate(catalog, epoch, ref_epoch=ref_epoch)
 
 
 # --- writing ------------------------------------------------------------------------------
 
-def _to_arrow(catalogue):
+def _to_arrow(catalog):
     """An astropy Table as an Arrow table in this module's schema."""
     import pyarrow as pa
 
     fields, arrays = [], []
-    n_rows = len(catalogue)
+    n_rows = len(catalog)
     for name in COLUMNS:
-        if name not in catalogue.colnames:
+        if name not in catalog.colnames:
             if name in _ALWAYS_PRESENT:
-                raise ValueError(f"catalogue is missing the {name!r} column")
+                raise ValueError(f"catalog is missing the {name!r} column")
             # A dataset may legitimately carry only some of the schema -- the columns
             # come from two Gaia tables and the expensive one is 790 GB in bulk form.
             # An absent column is written as entirely null, so it reads back masked,
@@ -484,7 +484,7 @@ def _to_arrow(catalogue):
             column = np.ma.masked_all(n_rows, dtype=_EMPTY_DTYPE.get(DTYPES[name],
                                                                      DTYPES[name]))
         else:
-            column = catalogue[name]
+            column = catalog[name]
         dtype = DTYPES[name]
         mask = np.ma.getmaskarray(column)
         values = np.ma.getdata(column)
@@ -529,8 +529,8 @@ def sha256_of(path, chunk=1 << 20):
     return digest.hexdigest()
 
 
-def write_dataset(catalogue, directory, compression="zstd"):
-    """Write a catalogue Table out as a partitioned dataset, and return its manifest.
+def write_dataset(catalog, directory, compression="zstd"):
+    """Write a catalog Table out as a partitioned dataset, and return its manifest.
 
     Used by the full-sky build tool and by the tests, which is why it takes a Table
     rather than talking to Gaia itself -- the source of the rows is not this module's
@@ -548,15 +548,15 @@ def write_dataset(catalogue, directory, compression="zstd"):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
 
-    order = np.argsort(np.asarray(catalogue["source_id"], dtype=np.int64), kind="stable")
-    catalogue = catalogue[order]
-    pixels = hpx_of(catalogue["source_id"])
+    order = np.argsort(np.asarray(catalog["source_id"], dtype=np.int64), kind="stable")
+    catalog = catalog[order]
+    pixels = hpx_of(catalog["source_id"])
     for pixel in np.unique(pixels):
-        write_part(catalogue[pixels == pixel], directory, compression=compression)
+        write_part(catalog[pixels == pixel], directory, compression=compression)
     return finalise_manifest(directory)
 
 
-def write_part(catalogue, directory, pixel=None, compression="zstd"):
+def write_part(catalog, directory, pixel=None, compression="zstd"):
     """Write the rows of one HEALPix part, and return its path.
 
     Split out from :func:`write_dataset` so an all-sky build can go part by part and be
@@ -565,7 +565,7 @@ def write_part(catalogue, directory, pixel=None, compression="zstd"):
     """
     import pyarrow.parquet as pq
 
-    pixels = np.unique(hpx_of(catalogue["source_id"]))
+    pixels = np.unique(hpx_of(catalog["source_id"]))
     if pixel is None:
         if len(pixels) != 1:
             raise ValueError(
@@ -580,14 +580,14 @@ def write_part(catalogue, directory, pixel=None, compression="zstd"):
     # not a sample. It is here because a build tool once laundered identifiers through
     # float64, silently rounding them together and merging distinct stars into one row's
     # identity. Nothing downstream would have noticed: the photometry stayed plausible.
-    ids = np.asarray(catalogue["source_id"], dtype=np.int64)
+    ids = np.asarray(catalog["source_id"], dtype=np.int64)
     if len(np.unique(ids)) != len(ids):
         raise ValueError(
             f"part {pixel} has {len(ids) - len(np.unique(ids))} duplicate source_id "
             "values; the identifiers have been corrupted upstream"
         )
 
-    arrow = _to_arrow(catalogue)
+    arrow = _to_arrow(catalog)
     path = part_path(pixel, directory)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".part")
@@ -687,7 +687,7 @@ def _fetch(url, dest, expect_sha256=None, chunk=1 << 20):
 
 
 def download(center=None, radius_deg=None, force=False, directory=None, quiet=False):
-    """Fetch the catalogue, or just the parts covering one region.
+    """Fetch the catalog, or just the parts covering one region.
 
     Idempotent: parts already present and checksum-listed are skipped, so an interrupted
     fetch resumes by being run again. Every part is verified against the manifest before
@@ -695,7 +695,7 @@ def download(center=None, radius_deg=None, force=False, directory=None, quiet=Fa
     as a mysteriously empty patch of sky.
 
     Pass ``center`` and ``radius_deg`` to fetch only the sky a project needs -- a few
-    tens of MB instead of the whole catalogue. Omit both for everything.
+    tens of MB instead of the whole catalog. Omit both for everything.
     """
     directory = Path(directory) if directory is not None else dataset_dir()
     directory.mkdir(parents=True, exist_ok=True)
@@ -732,5 +732,5 @@ def download(center=None, radius_deg=None, force=False, directory=None, quiet=Fa
         _fetch(f"{_base_url()}/hpx{HPX_LEVEL}={int(pixel):04d}/part.parquet",
                part_path(pixel, directory), expect_sha256=entry["sha256"])
     if not quiet:
-        print(f"[seestar-photometry] Gaia catalogue ready in {directory}", flush=True)
+        print(f"[seestar-photometry] Gaia catalog ready in {directory}", flush=True)
     return directory

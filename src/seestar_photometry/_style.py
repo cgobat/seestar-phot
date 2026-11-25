@@ -4,11 +4,11 @@ Matplotlib only, and **committed to a light surface**: these figures end up in
 notebooks, papers and PNGs on disk, all of which are light. There is no dark variant
 to keep in sync.
 
-Band colours
+Band colors
 ------------
-R/G/B are drawn red/green/blue because in this domain the colour *is* the band name --
+R/G/B are drawn red/green/blue because in this domain the color *is* the band name --
 relabelling them would be actively misleading to the reader. That choice is not free:
-red vs green is the classic colour-vision-deficiency collision, and measuring the
+red vs green is the classic color-vision-deficiency collision, and measuring the
 chosen steps (``#e34948`` / ``#008300`` / ``#2a78d6``) gives a worst-pair CVD
 separation of ΔE 7.2 (protan), inside the 6-8 floor band rather than clear of it.
 Alternatives were measured too -- every greener or lighter green traded protan
@@ -61,14 +61,14 @@ REFERENCE = "#52514e"
 #: Emphasis for a fitted model drawn over data.
 MODEL = "#4a3aa7"
 
-#: Status colours, reserved. Never reused as a series colour, and always paired with
+#: Status colors, reserved. Never reused as a series color, and always paired with
 #: a text label so state is not carried by hue alone.
 STATUS = {"good": "#0ca30c", "warning": "#fab219",
           "serious": "#ec835a", "critical": "#d03b3b"}
 
 
 def band_kw(band, filled=True):
-    """Colour + marker keywords for one band, with the secondary encoding applied."""
+    """Color + marker keywords for one band, with the secondary encoding applied."""
     return {
         "color": BAND_COLOR[band],
         "marker": BAND_MARKER[band],
@@ -78,7 +78,7 @@ def band_kw(band, filled=True):
 
 
 def cat_kw(index, label=None):
-    """Colour + marker keywords for categorical slot ``index`` (wraps by position)."""
+    """Color + marker keywords for categorical slot ``index`` (wraps by position)."""
     i = int(index) % len(CATEGORICAL)
     kw = {"color": CATEGORICAL[i], "marker": CAT_MARKER[i]}
     if label is not None:
@@ -136,7 +136,7 @@ def new_axes(ax, figsize=(5.2, 3.6)):
 
 
 def annotate(ax, text, loc="upper left"):
-    """Put a small stats block in a corner, in muted ink rather than a series colour."""
+    """Put a small stats block in a corner, in muted ink rather than a series color."""
     x, ha = (0.02, "left") if "left" in loc else (0.98, "right")
     y, va = (0.97, "top") if "upper" in loc else (0.03, "bottom")
     ax.text(x, y, text, transform=ax.transAxes, ha=ha, va=va,

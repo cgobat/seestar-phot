@@ -4,13 +4,13 @@ Three stages, all driven from a :class:`project.Project`, all sharing one runner
 
 1. :func:`solve_all` -- a ``.wcs`` sidecar per frame.
 2. :func:`build_frame_table` -- one quality row per frame, into ``frames.ecsv``.
-3. :func:`build_measurements` -- forced photometry of every catalogue source in every
+3. :func:`build_measurements` -- forced photometry of every catalog source in every
    frame, into ``stars.ecsv`` + ``measurements.ecsv``.
 
 They must be run in that order: stages 2 and 3 read the cached WCS and never solve.
 That separation is deliberate. Solving is network- or subprocess-bound and its cache
 is per-frame and reusable; characterisation and measurement are pure CPU once the
-WCS and catalogue are cached, so they parallelise cleanly across cores and can be
+WCS and catalog are cached, so they parallelise cleanly across cores and can be
 re-run freely as choices change.
 
 Everything here is **resumable and idempotent**. Frames already in the output table
@@ -31,9 +31,9 @@ from pathlib import Path
 import numpy as np
 from astropy.table import Table, vstack
 
-#: Per-worker catalogue cache. Loading the ECSV once per process instead of once per
+#: Per-worker catalog cache. Loading the ECSV once per process instead of once per
 #: frame is the difference between seconds and minutes over a large dataset.
-_CATALOGUE = None
+_CATALOG = None
 
 #: Outcome of processing one frame.
 #:
@@ -45,13 +45,13 @@ _CATALOGUE = None
 STATUSES = ("ok", "cached", "no_wcs", "load_error", "failed")
 
 
-def _init_worker(catalogue_path):
-    """Load the reference catalogue once per worker process, and quiet astroquery."""
-    global _CATALOGUE
+def _init_worker(catalog_path):
+    """Load the reference catalog once per worker process, and quiet astroquery."""
+    global _CATALOG
     from . import catalogs
 
-    if catalogue_path is not None:
-        _CATALOGUE = catalogs.load_catalogue(catalogue_path)
+    if catalog_path is not None:
+        _CATALOG = catalogs.load_catalog(catalog_path)
     try:
         from astroquery import log
 
@@ -69,7 +69,7 @@ def _log(project, message):
         fh.write(line + "\n")
 
 
-def _run(project, work_fn, keys, workers=None, pool="process", catalogue_path=None,
+def _run(project, work_fn, keys, workers=None, pool="process", catalog_path=None,
          on_result=None, checkpoint=None, label="run", quiet=False):
     """Map ``work_fn`` over ``keys``, tolerating per-frame failure.
 
@@ -95,9 +95,9 @@ def _run(project, work_fn, keys, workers=None, pool="process", catalogue_path=No
     executor = ProcessPoolExecutor if pool == "process" else ThreadPoolExecutor
     kwargs = {"max_workers": workers}
     if pool == "process":
-        kwargs.update(initializer=_init_worker, initargs=(catalogue_path,))
+        kwargs.update(initializer=_init_worker, initargs=(catalog_path,))
     else:
-        _init_worker(catalogue_path)  # threads share the parent's globals
+        _init_worker(catalog_path)  # threads share the parent's globals
 
     t0 = time.time()
     try:
@@ -172,7 +172,7 @@ def _solve_one(key, project):
             astrometry.solve(
                 frame, solver=project.solver, api_key=project.api_key,
                 astap_exe=project.astap_exe, thresh=project.thresh,
-                catalogue=_CATALOGUE,
+                catalog=_CATALOG,
             )
             return key, "solved", None
         except Exception as exc:
@@ -204,14 +204,14 @@ def solve_all(project, workers=None, force=False, limit=None):
     if not keys:
         return dict.fromkeys(STATUSES, 0), []
 
-    # The local solver pairs against the reference catalogue, so unlike the other
+    # The local solver pairs against the reference catalog, so unlike the other
     # backends this stage needs it -- built once here in the parent, then loaded once
     # per worker like the later stages do.
-    catalogue_path = None
+    catalog_path = None
     if project.solver == "local":
-        catalogue_path = project.catalogue_path
-        if not catalogue_path.exists():
-            project.catalogue()
+        catalog_path = project.catalog_path
+        if not catalog_path.exists():
+            project.catalog()
 
     if project.solver == "nova":
         pool, workers = "thread", min(workers or 4, 4)
@@ -219,7 +219,7 @@ def solve_all(project, workers=None, force=False, limit=None):
         pool, workers = "process", workers or max((os.cpu_count() or 4) - 2, 1)
     counts, problems = _run(
         project, _solve_one, keys, workers=workers, pool=pool, label="solve",
-        catalogue_path=catalogue_path,
+        catalog_path=catalog_path,
     )
     return counts, problems
 
@@ -257,7 +257,7 @@ def _frame_row(key, project):
             frame, thresh=project.thresh, enclosed=project.enclosed_characterise,
             mask=mask, isolation=project.isolation,
         )
-        ext.match_gaia(_CATALOGUE, wcs=wcs, tol_arcsec=project.match_tol_arcsec)
+        ext.match_gaia(_CATALOG, wcs=wcs, tol_arcsec=project.match_tol_arcsec)
         fits = {
             band: calibration.fit_zeropoint(
                 ext.sources, band=band, mag_range=project.fit_mag_range, **asdict(spec)
@@ -270,8 +270,8 @@ def _frame_row(key, project):
         }
         row = rows[primary].copy()
         for band, metrics in rows.items():
-            for name in ("reference_mag", "reference_system", "colour_label", "zeropoint",
-                         "zeropoint_err", "colour_term", "colour_term_err", "colour0",
+            for name in ("reference_mag", "reference_system", "color_label", "zeropoint",
+                         "zeropoint_err", "color_term", "color_term_err", "color0",
                          "rms", "chi2_red", "n_cal", "mag_lim_5sigma", "mag_lim_100sigma",
                          "mag_sat", "sigma_aper"):
                 row[f"{name}_{band}"] = metrics[name]
@@ -302,8 +302,8 @@ def build_frame_table(project, workers=None, force=False, limit=None,
     Returns the full frame table.
     """
     project.ensure_dirs()
-    catalogue_path = project.catalogue_path
-    project.catalogue()  # validate/cache once in the parent, before forking
+    catalog_path = project.catalog_path
+    project.catalog()  # validate/cache once in the parent, before forking
 
     existing = None
     done = set()
@@ -329,7 +329,7 @@ def build_frame_table(project, workers=None, force=False, limit=None,
     if keys:
         _run(
             project, _frame_row, keys, workers=workers, pool="process",
-            catalogue_path=catalogue_path, label="frames",
+            catalog_path=catalog_path, label="frames",
             on_result=lambda k, row: rows.append(row),
             checkpoint=lambda n: _write() if n % checkpoint_every == 0 else None,
         )
@@ -375,14 +375,14 @@ def _measure_sources(key, project):
     if wcs is None:
         return key, "no_wcs", None
     try:
-        in_frame = catalogs.sources_in_frame(_CATALOGUE, wcs, frame)
+        in_frame = catalogs.sources_in_frame(_CATALOG, wcs, frame)
         forced = photometry.forced_photometry(
             frame, in_frame["ra"], in_frame["dec"], wcs,
             source_id=in_frame["source_id"], thresh=project.thresh,
             enclosed=project.enclosed_lightcurve,
             mask=_frame_mask(project, frame, wcs), isolation=project.isolation,
         )
-        # The forced positions *are* catalogue sources, so their catalogue photometry
+        # The forced positions *are* catalog sources, so their catalog photometry
         # is carried straight through rather than re-matched. `forced` is three
         # per-band blocks, each in `in_frame` row order.
         n_band = len(photometry.BANDS)
@@ -411,10 +411,10 @@ def _measure_sources(key, project):
         reference_system = np.full(len(forced), "", dtype="U128")
         for band, cal in fits.items():
             select = np.asarray(forced["band"]) == band
-            colour, colour_mask, _ = calibration._pick_colour(forced[select], cal.colour_columns)
-            if colour_mask is not None:
-                colour = np.where(colour_mask, np.nan, colour)
-            mag[select] = calibration.apply_calibration(m_inst[select], cal, colour)
+            color, color_mask, _ = calibration._pick_color(forced[select], cal.color_columns)
+            if color_mask is not None:
+                color = np.where(color_mask, np.nan, color)
+            mag[select] = calibration.apply_calibration(m_inst[select], cal, color)
             transformed[select] = mag[select] - cal.zeropoint
             zeropoint[select] = cal.zeropoint
             zeropoint_err[select] = cal.zeropoint_err
@@ -454,7 +454,7 @@ def _measure_sources(key, project):
 
 
 def build_measurements(project, workers=None, limit=None, diagnostics=False):
-    """Forced-photometer every catalogue source in every solved frame.
+    """Forced-photometer every catalog source in every solved frame.
 
     Writes ``measurements.ecsv`` (one row per source, frame and band) and
     ``stars.ecsv`` (one row per source). Unlike :func:`build_frame_table` this is not
@@ -465,8 +465,8 @@ def build_measurements(project, workers=None, limit=None, diagnostics=False):
     Returns ``(stars, measurements)``.
     """
     project.ensure_dirs()
-    catalogue_path = project.catalogue_path
-    project.catalogue()  # validate configured reference columns before forking
+    catalog_path = project.catalog_path
+    project.catalog()  # validate configured reference columns before forking
 
     keys = project.frames()
     if limit is not None:
@@ -476,7 +476,7 @@ def build_measurements(project, workers=None, limit=None, diagnostics=False):
     parts = []
     _run(
         project, _measure_sources, keys, workers=workers, pool="process",
-        catalogue_path=catalogue_path, label="measure",
+        catalog_path=catalog_path, label="measure",
         on_result=lambda k, t: parts.append(t),
     )
     if not parts:
@@ -488,9 +488,9 @@ def build_measurements(project, workers=None, limit=None, diagnostics=False):
 
     measurements = vstack(parts, metadata_conflicts="silent")
     measurements.sort(["source_id", "band", "mjd_mid"])
-    catalogue = catalogs.load_catalogue(catalogue_path)
+    catalog = catalogs.load_catalog(catalog_path)
     stars = lightcurves.build_stars(
-        catalogue, np.unique(measurements["source_id"]), project.target.radec,
+        catalog, np.unique(measurements["source_id"]), project.target.radec,
         target_id=project.target.source_id,
     )
     measurements.write(project.measurements_path, format="ascii.ecsv", overwrite=True)

@@ -26,7 +26,7 @@ Each module imports only from layers above it.
 | measure | `photometry` | **The standard path**: detection, per-band aperture sizing, fixed-aperture and forced flux, curve of growth, background fit |
 | measure | `astrometry` | Per-frame WCS via ASTAP or astrometry.net, cached as a `.wcs` sidecar |
 | measure | `catalogs` | Cached oversized Gaia mosaic, footprint subsetting, cross-match |
-| calibrate | `calibration` | Zero point + colour term against synthetic V; limiting and saturation magnitudes; sky brightness |
+| calibrate | `calibration` | Zero point + color term against synthetic V; limiting and saturation magnitudes; sky brightness |
 | calibrate | `quality` | The `frames.ecsv` row builder and schema |
 | science | `lightcurves` | Timing, comparison selection, ensemble differential, period tools |
 | science | `contamination` | Extended-emission (host galaxy) subtraction |
@@ -34,10 +34,10 @@ Each module imports only from layers above it.
 | orchestrate | `project` | `Target`, `Project` — the whole configuration surface |
 | orchestrate | `pipeline` | The three batch stages over one resumable runner |
 | inspect | `plots`, `report` | Diagnostic figures, and saved figure sets |
-| inspect | `_style` | The one place figure colours, markers and rc settings are decided |
+| inspect | `_style` | The one place figure colors, markers and rc settings are decided |
 | cross-check | `kron` | Kron/AUTO photometry — never the science path |
 | support | `examples` | The on-demand real dataset every doc example and real-data test runs on |
-| support | `gaiadb` | The opt-in offline Gaia catalogue: HEALPix-partitioned Parquet, cone queries, epoch propagation |
+| support | `gaiadb` | The opt-in offline Gaia catalog: HEALPix-partitioned Parquet, cone queries, epoch propagation |
 | support | `astap` | Locating the ASTAP solver, and fetching one when there is none |
 
 ## Conventions, and why
@@ -85,7 +85,7 @@ two concerns apart is why the science code reads cleanly.
 
 `pipeline._run` replaces four copy-pasted drivers in the predecessor. One contract:
 
-- `ProcessPoolExecutor` with an initializer that loads the catalogue **once per worker** —
+- `ProcessPoolExecutor` with an initializer that loads the catalog **once per worker** —
   the difference between seconds and minutes over a large dataset;
 - **threads instead of processes when `workers == 1`**, since a single worker gains nothing
   from a separate process and pays the full spawn cost (on Windows, re-importing astropy and
@@ -144,7 +144,7 @@ version constant so a bump never needs a stale copy invalidated by hand.
 | | Size | Where | Keyed on |
 |---|---|---|---|
 | example data | 18 MB | GitHub release asset | `examples.DATA_VERSION` |
-| Gaia catalogue | 6.35 GB all sky, or the parts you ask for | CrowdSky webspace | `gaiadb.DATA_RELEASE` + `DATA_VERSION` |
+| Gaia catalog | 6.35 GB all sky, or the parts you ask for | CrowdSky webspace | `gaiadb.DATA_RELEASE` + `DATA_VERSION` |
 | ASTAP + star database | 106 MB | CrowdSky webspace | `astap.VERSION` |
 
 Both webspace URLs honour an environment override (`SEESTAR_GAIA_URL`, `SEESTAR_ASTAP_URL`)

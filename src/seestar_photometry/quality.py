@@ -17,7 +17,7 @@ Reading the important columns:
     to spot frames that are *much* worse than their peers, not as an absolute test.
 ``v_lim_5sigma`` / ``v_lim_100sigma``
     Faint and bright-ish ends of the usable range, extrapolated from the zero point
-    and empirical blank-aperture noise at the fiducial colour. These are
+    and empirical blank-aperture noise at the fiducial color. These are
     background-noise thresholds, not completeness measurements -- see
     :func:`calibration.limiting_mag`.
 ``v_sat``
@@ -106,15 +106,15 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
         "science_band": cal.band,
         "reference_mag": cal.reference_mag,
         "reference_system": cal.reference_system,
-        "colour_label": cal.colour_label,
-        "colour_degree": cal.degree,
-        "colour_coefficients": cal.model.parameters if cal.model is not None else
-                               np.array([cal.zeropoint, cal.colour_term]),
+        "color_label": cal.color_label,
+        "color_degree": cal.degree,
+        "color_coefficients": cal.model.parameters if cal.model is not None else
+                               np.array([cal.zeropoint, cal.color_term]),
         "zeropoint": cal.zeropoint,
         "zeropoint_err": cal.zeropoint_err,
-        "colour_term": cal.colour_term,
-        "colour_term_err": cal.colour_term_err,
-        "colour0": cal.colour0,
+        "color_term": cal.color_term,
+        "color_term_err": cal.color_term_err,
+        "color0": cal.color0,
         "rms": cal.rms,
         "chi2_red": cal.chi2_red,
         "fit_mag_lo": cal.mag_range[0] if cal.mag_range else np.nan,

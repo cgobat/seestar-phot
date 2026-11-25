@@ -40,7 +40,7 @@ green.
 For `GRBG` as the array is indexed, green sits on `(0,0)` and `(1,1)` of each 2×2 quad, red
 on `(0,1)`, blue on `(1,0)`, with no row flip. The check: the two green sub-lattices agree
 to 4 ADU with matching sigma, while `(0,1)` reads 986 and `(1,0)` 1103. Get the phase wrong
-and you silently swap colour planes.
+and you silently swap color planes.
 ```
 
 ## Co-add

@@ -8,12 +8,12 @@ detail — this page is the map.
 | data | `frames` | Load any layout into one `(3, ny, nx)` cube; resolve header dialects; discover frames |
 | data | `debayer` | Bayer demosaic for raw subs |
 | measure | `photometry` | **The standard path**: detection, per-band aperture, fixed and forced flux |
-| measure | `astrometry` | Per-frame WCS against the catalogue, ASTAP or astrometry.net, cached as a sidecar |
+| measure | `astrometry` | Per-frame WCS against the catalog, ASTAP or astrometry.net, cached as a sidecar |
 | measure | `catalogs` | Cached Gaia mosaic, footprint subsetting, cross-match |
 | measure | `stacking` | Register and co-add raw subs |
-| support | `gaiadb` | The offline Gaia catalogue: an opt-in local copy of the TAP query |
+| support | `gaiadb` | The offline Gaia catalog: an opt-in local copy of the TAP query |
 | support | `astap` | Locating the ASTAP solver, and fetching one when there is none |
-| calibrate | `calibration` | Zero point + colour term; limiting and saturation magnitudes |
+| calibrate | `calibration` | Zero point + color term; limiting and saturation magnitudes |
 | calibrate | `quality` | The frame-table row |
 | science | `lightcurves` | Timing, comparison selection, ensemble differential, periods |
 | science | `contamination` | Host-galaxy subtraction |

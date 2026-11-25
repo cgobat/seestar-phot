@@ -11,9 +11,9 @@
 # meta: !!omap
 # - comments: ['Seestar total-system passbands (relative response), per unit model.', Sensor QE from tools/sensor_qe.ecsv times a UV/IR-cut
 #       model whose red edge and, per-channel red-shoulder scales are FITTED from each unit's own 20 Cep frames, by zeroing the zero-point
-#       colour term against Gaia BP-RP., 'Blue edge 390 nm, 10-90% width 15 nm, peak 0.97.', 's30pro (imx585): IR-cut red edge 678.4 nm,
+#       color term against Gaia BP-RP., 'Blue edge 390 nm, 10-90% width 15 nm, peak 0.97.', 's30pro (imx585): IR-cut red edge 678.4 nm,
 #       G tail x1.723, B tail x2.452', 's50pro (os08b10): IR-cut red edge 684.9 nm, G tail x1.644, B tail x2.043', 'The S50 is NOT here:
-#       see tools/bayer_passbands.ecsv, which the deployed', catalogue's r/g/b_s50_mag columns were integrated through., Built by tools/fit_unit_passbands.py.]
+#       see tools/bayer_passbands.ecsv, which the deployed', catalog's r/g/b_s50_mag columns were integrated through., Built by tools/fit_unit_passbands.py.]
 # schema: astropy-2.0
 wavelength_nm R_s30pro G_s30pro B_s30pro R_s50pro G_s50pro B_s50pro
 336.0 1.4056293550965989e-08 1.1020134143957329e-08 8.894822559051278e-08 3.7780479035522225e-09 1.4309356434704064e-08 7.083839819160417e-10

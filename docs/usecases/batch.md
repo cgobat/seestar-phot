@@ -18,7 +18,7 @@ proj = Project(
 )
 ```
 
-Set `source_id` when you know it. Without it the target is taken to be the catalogue source
+Set `source_id` when you know it. Without it the target is taken to be the catalog source
 nearest the pointing, which is right for an isolated centred target and wrong in a crowded
 field.
 
@@ -32,7 +32,7 @@ stars, meas = pipeline.build_measurements(proj)            # stars.ecsv, measure
 
 The order is required: stages 2 and 3 read the cached WCS and never solve. That split is
 deliberate — solving is network- or subprocess-bound and its cache is per-frame and reusable,
-while characterisation and measurement are pure CPU once the WCS and catalogue are cached, so
+while characterisation and measurement are pure CPU once the WCS and catalog are cached, so
 they parallelise across cores and can be re-run freely as choices change.
 
 ```python

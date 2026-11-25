@@ -8,10 +8,10 @@ The Seestar PSF is chromatic: the cheap optics focus best near green, so both th
 red and blue planes are measurably broader than green (typically R ~1.1x, B up to
 ~1.3x the green FWHM, varying frame to frame with focus). A single radius shared
 across bands would therefore enclose a different flux fraction in each band and
-bias the B-R colour the Gaia calibration relies on -- and because the broadening
+bias the B-R color the Gaia calibration relies on -- and because the broadening
 tracks focus, that bias varies frame to frame and cannot be absorbed into a
-constant colour term. Sizing each band to the same enclosed *fraction* instead
-makes the aperture correction identical across bands, so it cancels in colours and
+constant color term. Sizing each band to the same enclosed *fraction* instead
+makes the aperture correction identical across bands, so it cancels in colors and
 is absorbed into each per-frame, per-band zero point.
 
 Kron/AUTO photometry lives in :mod:`kron`; it is kept only as a cross-check
@@ -107,14 +107,14 @@ class Extraction:
     cogs: list = field(default=None, repr=False)
     frame: object = field(default=None, repr=False)
 
-    def solve_wcs(self, api_key=None, force=False, solver="nova", catalogue=None):
-        """Solve (or load cached) the frame's WCS from this source catalogue.
+    def solve_wcs(self, api_key=None, force=False, solver="nova", catalog=None):
+        """Solve (or load cached) the frame's WCS from this source catalog.
 
         Reuses the green-band detections as the solver's source list, so no second
         extraction is needed. The solution is cached as a ``.wcs`` sidecar next to
         the FITS file. Returns an :class:`astropy.wcs.WCS`.
 
-        ``catalogue`` is the reference table ``solver="local"`` pairs against, and is
+        ``catalog`` is the reference table ``solver="local"`` pairs against, and is
         ignored by the other solvers.
         """
         from . import astrometry
@@ -125,15 +125,15 @@ class Extraction:
         order = np.argsort(np.asarray(g["flux"]))[::-1]  # brightest first
         return astrometry.solve_from_sources(
             self.frame, np.asarray(g["x"])[order], np.asarray(g["y"])[order],
-            api_key=api_key, force=force, solver=solver, catalogue=catalogue,
+            api_key=api_key, force=force, solver=solver, catalog=catalog,
         )
 
     def match_gaia(self, gaia, wcs=None, tol_arcsec=2.0):
-        """Cross-match this extraction's sources to a reference catalogue.
+        """Cross-match this extraction's sources to a reference catalog.
 
         Solves/loads the WCS (or uses the one passed), subsets ``gaia`` to this
         frame's footprint, and augments ``.sources`` **in place** with ``ra``,
-        ``dec``, ``sep_arcsec`` and the matched catalogue columns (synthetic V,
+        ``dec``, ``sep_arcsec`` and the matched catalog columns (synthetic V,
         B/R, ``phot_variable_flag``, ...), masked where there is no match. Returns
         the augmented table as well.
         """
@@ -421,7 +421,7 @@ def aperture_correction(frame, radius, band="G", cog=None, mask=None):
 
     Note that the standard path never needs this: sizing every band to the same
     enclosed fraction makes the correction a constant that is absorbed into the
-    zero point and cancels in colours. It is here for putting a total magnitude on
+    zero point and cancels in colors. It is here for putting a total magnitude on
     an absolute scale.
     """
     if cog is None:
@@ -490,7 +490,7 @@ def extract_sources(
 
     The aperture is sized **per frame and per band** from each plane's PSF, so every
     band encloses the same flux fraction and its aperture correction is identical --
-    keeping the B-R colour unbiased despite the chromatic Seestar PSF (see the
+    keeping the B-R color unbiased despite the chromatic Seestar PSF (see the
     module docstring). Only sources with SNR > 5 are kept.
 
     Parameters
@@ -584,7 +584,7 @@ def forced_photometry(
     ----------
     frame : SeestarFrame
     ra, dec : array-like
-        Sky positions (deg) to measure -- typically in-footprint catalogue sources.
+        Sky positions (deg) to measure -- typically in-footprint catalog sources.
     wcs : astropy.wcs.WCS
         The frame's WCS, to map ``(ra, dec)`` to pixels.
     source_id : array-like, optional
@@ -653,7 +653,7 @@ def aperture_depth(extraction, band="G", mask=None, n_sigma=5.0,
     the science photometry, retaining demosaic/resampling covariance. This is an
     aperture-noise threshold, not injection/recovery completeness, and does not
     include source Poisson noise. A standard-system magnitude limit additionally
-    requires a zeropoint and an assumed source colour.
+    requires a zeropoint and an assumed source color.
 
     Source footprints are detected at 2 sigma with Photutils segmentation and
     padded by two FWHM beyond the aperture radius. Non-finite pixels and an
@@ -737,7 +737,7 @@ def instrumental_mag(flux):
     Non-positive forced fluxes are normal, not an error: a faint or absent source
     measured in a fixed aperture on a background-subtracted image scatters either
     side of zero. They must become nan rather than raise or warn, because the
-    light-curve tables measure every catalogue position in every frame.
+    light-curve tables measure every catalog position in every frame.
     """
     flux = np.asarray(flux, dtype=float)
     with np.errstate(invalid="ignore", divide="ignore"):

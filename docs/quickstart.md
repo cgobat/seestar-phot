@@ -56,7 +56,7 @@ print(ext.aperture)   # [4.67 4.37 6.35]  px, R G B
 ```
 
 Red is 1.15× and blue 1.22× the green FWHM. That is the Seestar's chromatic aberration, not
-noise, and it is why a single shared radius would bias every colour — see
+noise, and it is why a single shared radius would bias every color — see
 [photometry-design](photometry-design.md).
 
 ## Calibrate onto Gaia V
@@ -71,12 +71,12 @@ print(cal)
 
 ```
 zeropoint   = 23.644 ± 0.003 mag
-colour_term = +0.036   at colour0 = 1.137 (B-R, JKC)
+color_term = +0.036   at color0 = 1.137 (B-R, JKC)
 rms         = 0.016 mag over 59 stars
 ```
 
-The fit is `V = m_inst + ZP + k·(B−R − colour0)`, restricted to V ∈ [10, 14], with
-catalogue variables and sigma-clipped outliers excluded. An rms of 0.016 mag is a good
+The fit is `V = m_inst + ZP + k·(B−R − color0)`, restricted to V ∈ [10, 14], with
+catalog variables and sigma-clipped outliers excluded. An rms of 0.016 mag is a good
 frame; below 0.06 counts as photometric-grade.
 
 ```{admonition} chi2_red will look alarming
@@ -99,7 +99,7 @@ wcs = astrometry.load_wcs(frame)                # reads the cache on later runs
 ```
 
 Check it worked by the only measure that matters — how well the sources land on the
-catalogue:
+catalog:
 
 ```python
 print(astrometry.match_quality(ext.band("G")))
@@ -131,7 +131,7 @@ report.frame_report(frame, ext, cal, "diagnostics/")
 ```
 
 Thirteen figures: curve of growth with the chosen aperture marked, per-band FWHM ratios, the
-zero-point relation and colour-term fit, residuals against magnitude, SNR and position, the
+zero-point relation and color-term fit, residuals against magnitude, SNR and position, the
 background triptych, detections with apertures drawn on, and the cross-match separation
 histogram. [diagnostics](diagnostics.md) says what each one answers and what wrong looks
 like.

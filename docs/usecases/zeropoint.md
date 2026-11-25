@@ -3,7 +3,7 @@
 Turning aperture counts into magnitudes needs one number per frame, and it has to be
 re-derived per frame because transparency changes. The package fits
 
-$$V = m_\mathrm{inst} + \mathrm{ZP} + k\,(B-R - \mathrm{colour_0})$$
+$$V = m_\mathrm{inst} + \mathrm{ZP} + k\,(B-R - \mathrm{color_0})$$
 
 against Gaia DR3 **synthetic** Johnson-Kron-Cousins V.
 
@@ -18,36 +18,36 @@ ext.match_gaia(examples.gaia(), wcs=examples.wcs())
 
 cal = calibration.fit_zeropoint(ext.sources, band="G")
 print(f"ZP   = {cal.zeropoint:.3f} +- {cal.zeropoint_err:.3f}")
-print(f"k    = {cal.colour_term:+.3f} at colour0 = {cal.colour0:.3f} ({cal.colour_label})")
+print(f"k    = {cal.color_term:+.3f} at color0 = {cal.color0:.3f} ({cal.color_label})")
 print(f"rms  = {cal.rms:.3f} mag over {cal.n_stars} stars")
 ```
 
 ```
 ZP   = 23.644 +- 0.003
-k    = +0.036 at colour0 = 1.137 (B-R (JKC))
+k    = +0.036 at color0 = 1.137 (B-R (JKC))
 rms  = 0.016 mag over 59 stars
 ```
 
 ## Why each piece is the way it is
 
 **Gaia synthetic V, not APASS.** It is homogeneous across the whole sky, and it carries
-colour information, which is what makes a per-frame colour term fittable at all. Sources
+color information, which is what makes a per-frame color term fittable at all. Sources
 without synthetic photometry come through masked, so a non-masked `v_jkc_mag` always means a
 usable calibrator.
 
-**A colour term, because green is not V.** The green Bayer channel through the Seestar's
+**A color term, because green is not V.** The green Bayer channel through the Seestar's
 IRCUT filter is a good but inexact match to Johnson V. The residual mismatch is small
-(k = +0.036 here) but it is real, and it is colour-dependent, so ignoring it puts a
-colour-correlated error into every magnitude.
+(k = +0.036 here) but it is real, and it is color-dependent, so ignoring it puts a
+color-correlated error into every magnitude.
 
-**ZP quoted at `colour0`, the field's median colour.** This decorrelates the zero point from
-the colour term. Without it the two trade off against each other and per-frame zero points
+**ZP quoted at `color0`, the field's median color.** This decorrelates the zero point from
+the color term. Without it the two trade off against each other and per-frame zero points
 are not comparable — which defeats the purpose of measuring one per frame.
 
 **A magnitude window, V ∈ [10, 14].** Above it stars saturate and the flux stops tracking V;
 below it the noise floor fans the relation out. Either intruding into the fit biases it.
 
-**Sigma clipping, and variables excluded.** Catalogue-flagged variables are dropped, and
+**Sigma clipping, and variables excluded.** Catalog-flagged variables are dropped, and
 3σ outliers are clipped over two refits.
 
 ## Reading the result
@@ -62,26 +62,26 @@ below it the noise floor fans the relation out. Either intruding into the fit bi
 ## Applying it
 
 ```python
-mag = calibration.apply_calibration(m_inst, cal, colour=star_bp_rp)
+mag = calibration.apply_calibration(m_inst, cal, color=star_bp_rp)
 ```
 
-With no colour for a source the colour term is dropped, which is exact at the field's median
-colour and degrades linearly away from it — fine for a red-ish target, worth a thought for a
+With no color for a source the color term is dropped, which is exact at the field's median
+color and degrades linearly away from it — fine for a red-ish target, worth a thought for a
 very blue one.
 
 ## Graceful degradation
 
-The colour source cascades **B−R (JKC) → BP−RP → none**, and with no colour at all the fit
-becomes a sigma-clipped zero-point mean with `colour_term = 0`. The reference magnitude
+The color source cascades **B−R (JKC) → BP−RP → none**, and with no color at all the fit
+becomes a sigma-clipped zero-point mean with `color_term = 0`. The reference magnitude
 falls back from `v_jkc_mag` to a plain `v_mag`. That exists so the fit keeps working against
-a different catalogue schema, not to squeeze out accuracy.
+a different catalog schema, not to squeeze out accuracy.
 
 ## Check it by looking
 
 ```python
 from seestar_photometry import plots
 
-plots.zeropoint_vs_colour(cal)          # the fit itself
+plots.zeropoint_vs_color(cal)          # the fit itself
 plots.reference_vs_instrumental(cal)    # is the relation linear over the window?
 plots.residual_vs(cal, against="v")     # any brightness-dependent bias?
 plots.residual_map(cal, shape=frame.shape)   # spatial systematics
@@ -107,28 +107,28 @@ More detail in [astrometry-and-gaia](../astrometry-and-gaia.md).
 
 ## Other channels and reference systems
 
-`calibration.fit_zeropoint` accepts `reference_mag`, `colour_columns`, and
+`calibration.fit_zeropoint` accepts `reference_mag`, `color_columns`, and
 `reference_system` for every camera channel. For example:
 
 ```python
 cal_r = calibration.fit_zeropoint(
     ext.sources, band="R", reference_mag="r_jkc_mag",
-    colour_columns=("b_jkc_mag", "r_jkc_mag"),
+    color_columns=("b_jkc_mag", "r_jkc_mag"),
     reference_system="Cousins R (Vega)",
 )
 ```
 
 `Project.band_calibrations` maps channels to `CalibrationSpec` objects and applies
 those same choices in both pipeline stages. The default remains G-to-V. Configure
-Sloan r with a reference catalogue column in that system; missing requested columns
-raise rather than falling back to V. Custom catalogue columns survive cross-matching
-and the stars table. `colour_columns=()` disables the colour term; a single string
-selects a precomputed catalogue colour. A pair selects their difference, including
+Sloan r with a reference catalog column in that system; missing requested columns
+raise rather than falling back to V. Custom catalog columns survive cross-matching
+and the stars table. `color_columns=()` disables the color term; a single string
+selects a precomputed catalog color. A pair selects their difference, including
 synthetic Seestar G-R where available. This release does not fit noisy measured
-instrumental colours or propagate their shared measurement errors.
+instrumental colors or propagate their shared measurement errors.
 
 The calibrated measurement table carries each band's reference system and zeropoint.
-`m_transformed` contains the colour correction before the zeropoint; use it as
-`inst_col` when forming a colour-corrected ensemble light curve, along with the
+`m_transformed` contains the color correction before the zeropoint; use it as
+`inst_col` when forming a color-corrected ensemble light curve, along with the
 matching `band` and `cat_mag_col`. Calibration columns on unconfigured bands are
-NaN. Standard-system depth is conditional on the fit's fiducial colour.
+NaN. Standard-system depth is conditional on the fit's fiducial color.

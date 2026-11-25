@@ -1,18 +1,18 @@
 #!/usr/bin/env python
-"""Add synthetic Seestar S50 magnitudes to the all-sky Gaia catalogue.
+"""Add synthetic Seestar S50 magnitudes to the all-sky Gaia catalog.
 
 Integrates every Gaia DR3 XP sampled mean spectrum through the S50's fitted R/G/B
 passbands and writes the six new columns (:data:`S50_COLUMNS`) into a copy of the
 :mod:`gaiadb` dataset. Calibrating the Bayer planes against these instead of
-``v_jkc_mag``/``b_jkc_mag``/``r_jkc_mag`` removes the zero point's colour term: measured
+``v_jkc_mag``/``b_jkc_mag``/``r_jkc_mag`` removes the zero point's color term: measured
 on 57 fifteen-minute 20 Cep stacks, G +0.054 -> -0.002, R -0.132 -> -0.002, B +0.548 ->
 ~0 mag/mag, and the B-plane calibrator rms fell from 347 to 104 mmag.
 
 **The spectra reach G < 15.0 and no further.** ESA's bulk ``xp_sampled_mean_spectrum``
 product is the bright subset of the XP population. Measured over the finished all-sky
-build, coverage of the V < 17.5 catalogue is 100% below G = 15.0000 and 0% above it --
+build, coverage of the V < 17.5 catalog is 100% below G = 15.0000 and 0% above it --
 34,238,688 of 148,667,792 rows, 23.03%. So the six columns are populated for the bright
-quarter of the catalogue and masked for the rest, which is the shape the calibration wants
+quarter of the catalog and masked for the rest, which is the shape the calibration wants
 anyway (a saturated-to-faint Seestar stack draws its calibrators from roughly V 11-16).
 Full coverage would mean the ``xp_continuous_mean_spectrum`` product instead: 3.6 TB
 against 114 GB, and a GaiaXPy sampling pass per source rather than a numpy dot product.

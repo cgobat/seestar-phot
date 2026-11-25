@@ -239,7 +239,7 @@ def crowdsky():
 
     The second FITS layout, with the different header dialect (``NIMAGES``, and
     ``EXPTIME`` meaning the *total* on-sky time) plus a ``FOOTPRINT`` plane and the
-    server's own ``STAR-TAB`` catalogue. Its header WCS is trustworthy, so
+    server's own ``STAR-TAB`` catalog. Its header WCS is trustworthy, so
     ``astrometry.lift`` applies.
     """
     return _load("crowdsky")
@@ -272,7 +272,7 @@ def gaia():
 
     Trimmed from a 1.5 degree mosaic to what these cutouts need, so
     :func:`calibration.fit_zeropoint` works with no TAP query. Drop-in wherever the
-    pipeline wants a reference catalogue.
+    pipeline wants a reference catalog.
     """
     from astropy.table import Table
 
@@ -324,6 +324,6 @@ def project(work_dir, **kwargs):
         **kwargs,
     )
     proj.ensure_dirs()
-    if not proj.catalogue_path.exists():
-        shutil.copy(path("gaia_mwcam"), proj.catalogue_path)
+    if not proj.catalog_path.exists():
+        shutil.copy(path("gaia_mwcam"), proj.catalog_path)
     return proj

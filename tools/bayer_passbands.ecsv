@@ -9,7 +9,7 @@
 # - comments: ['Seestar S50 total-system passbands R_S50, G_S50, B_S50 (relative response).', 'Named per unit model: the S30/S30 Pro/S50
 #       Pro use different sensors', '(IMX585, OS08B10) and will get their own fitted curves.', IMX462 sensor curves digitized from the
 #       Sony datasheet plot (paper/data/imx462_ssc.jpg) by color-masking; +/- a few % of peak., 'UV/IR-cut model: logistic edges, half
-#       power 390 / 693 nm, 10-90% width 15 nm (red edge fitted from the ZP colour terms; see module comment).', Lens transmission assumed
+#       power 390 / 693 nm, 10-90% width 15 nm (red edge fitted from the ZP color terms; see module comment).', Lens transmission assumed
 #       flat and omitted., Built by paper/scripts/build_bayer_passbands.py.]
 # schema: astropy-2.0
 wavelength_nm R_S50 G_S50 B_S50

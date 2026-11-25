@@ -30,7 +30,7 @@ def test_import_does_not_pull_in_matplotlib():
 
 
 def test_import_does_not_pull_in_astroquery():
-    """astroquery is only needed to *build* a catalogue, not to use a cached one, and
+    """astroquery is only needed to *build* a catalog, not to use a cached one, and
     importing it is slow -- which matters when every worker process pays the cost."""
     out = _run(
         "import sys, seestar_photometry; "

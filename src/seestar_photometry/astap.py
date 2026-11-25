@@ -20,10 +20,10 @@ Why a download and not a dependency: there is no PyPI package that bundles ASTAP
 problem rather than the solution. ASTAP is `MPL-2.0
 <https://github.com/han-k59/astap>`_, so redistributing it is allowed, and the pieces
 are small -- the command-line binary is 1.4 MB and the smallest star database is 100 MB,
-less than the offline Gaia catalogue.
+less than the offline Gaia catalog.
 
 **Star databases.** ASTAP matches against its own quad database, which is separate from
-the photometric reference catalogue in :mod:`gaiadb` and cannot be substituted for it.
+the photometric reference catalog in :mod:`gaiadb` and cannot be substituted for it.
 ``d05`` (500 stars/deg^2, 100 MB) is the default and covers fields from 0.6 to 10
 degrees, which spans both Seestar models -- an S50 sub is 0.72 x 1.28 degrees and an
 S30pro 2.24 x 3.99. ``d20`` (400 MB) goes down to 0.3 degrees and is the one to fetch if

@@ -6,7 +6,7 @@ from astropy.table import MaskedColumn, Table
 
 from seestar_photometry import calibration, quality
 
-from conftest import K_TRUE, ZP_TRUE, expected_zeropoint, make_catalogue, make_wcs
+from conftest import K_TRUE, ZP_TRUE, expected_zeropoint, make_catalog, make_wcs
 
 
 def test_zeropoint_recovered(calibration_fit):
@@ -25,14 +25,14 @@ def test_zeropoint_shifts_with_the_aperture_fraction(extraction, cube_frame):
     from seestar_photometry import photometry
 
     wide = photometry.extract_sources(cube_frame, enclosed=0.95)
-    wide.match_gaia(make_catalogue(), wcs=make_wcs())
+    wide.match_gaia(make_catalog(), wcs=make_wcs())
     cal95 = calibration.fit_zeropoint(wide.sources)
     assert cal95.zeropoint == pytest.approx(expected_zeropoint(0.95), abs=0.02)
-    assert cal95.colour_term == pytest.approx(K_TRUE, abs=0.03)
+    assert cal95.color_term == pytest.approx(K_TRUE, abs=0.03)
 
 
-def test_colour_term_recovered(calibration_fit):
-    assert calibration_fit.colour_term == pytest.approx(K_TRUE, abs=0.03)
+def test_color_term_recovered(calibration_fit):
+    assert calibration_fit.color_term == pytest.approx(K_TRUE, abs=0.03)
 
 
 def test_scatter_is_small_for_noise_free_truth(calibration_fit):
@@ -41,12 +41,12 @@ def test_scatter_is_small_for_noise_free_truth(calibration_fit):
     assert calibration_fit.rms < 0.02
 
 
-def test_colour0_decorrelates_the_zeropoint(calibration_fit, extraction):
-    """ZP is quoted at the median colour, so colour0 must be that median."""
+def test_color0_decorrelates_the_zeropoint(calibration_fit, extraction):
+    """ZP is quoted at the median color, so color0 must be that median."""
     green = extraction.band("G")
-    colour = (np.asarray(green["b_jkc_mag"], dtype=float)
+    color = (np.asarray(green["b_jkc_mag"], dtype=float)
               - np.asarray(green["r_jkc_mag"], dtype=float))
-    assert calibration_fit.colour0 == pytest.approx(np.median(colour), abs=0.05)
+    assert calibration_fit.color0 == pytest.approx(np.median(color), abs=0.05)
 
 
 def test_fit_respects_the_magnitude_window(extraction):
@@ -57,29 +57,29 @@ def test_fit_respects_the_magnitude_window(extraction):
     assert narrow.zeropoint == pytest.approx(wide.zeropoint, abs=0.05)
 
 
-def test_colour_cascade_falls_back_to_bp_rp(extraction):
-    """Without synthetic JKC colours the fit must fall back to Gaia native BP-RP."""
+def test_color_cascade_falls_back_to_bp_rp(extraction):
+    """Without synthetic JKC colors the fit must fall back to Gaia native BP-RP."""
     sources = extraction.sources.copy()
     sources.remove_columns(["b_jkc_mag", "r_jkc_mag"])
     cal = calibration.fit_zeropoint(sources)
-    assert cal.colour_label == "BP-RP"
+    assert cal.color_label == "BP-RP"
     assert cal.zeropoint == pytest.approx(expected_zeropoint(), abs=0.05)
 
 
-def test_fit_degrades_to_a_clipped_mean_without_colour(extraction):
-    """No colour at all must still give a usable zero point, with k pinned at zero."""
+def test_fit_degrades_to_a_clipped_mean_without_color(extraction):
+    """No color at all must still give a usable zero point, with k pinned at zero."""
     sources = extraction.sources.copy()
     sources.remove_columns(["b_jkc_mag", "r_jkc_mag", "bp_rp"])
     cal = calibration.fit_zeropoint(sources)
-    assert cal.colour_label == "none"
-    assert cal.colour_term == 0.0
-    assert np.isnan(cal.colour0)
-    # Without the colour term the scatter grows, but the mean must stay right.
+    assert cal.color_label == "none"
+    assert cal.color_term == 0.0
+    assert np.isnan(cal.color0)
+    # Without the color term the scatter grows, but the mean must stay right.
     assert cal.zeropoint == pytest.approx(expected_zeropoint(), abs=0.10)
 
 
 def test_v_column_falls_back_to_v_mag(extraction):
-    """A non-Gaia reference catalogue using plain 'v_mag' must work."""
+    """A non-Gaia reference catalog using plain 'v_mag' must work."""
     sources = extraction.sources.copy()
     sources.rename_column("v_jkc_mag", "v_mag")
     cal = calibration.fit_zeropoint(sources)
@@ -120,9 +120,9 @@ def test_apply_calibration_round_trips(calibration_fit, extraction):
     green = extraction.band("G")
     matched = ~np.ma.getmaskarray(green["v_jkc_mag"])
     m_inst = -2.5 * np.log10(np.asarray(green["flux"], dtype=float))
-    colour = (np.asarray(green["b_jkc_mag"], dtype=float)
+    color = (np.asarray(green["b_jkc_mag"], dtype=float)
               - np.asarray(green["r_jkc_mag"], dtype=float))
-    v = calibration.apply_calibration(m_inst, calibration_fit, colour)
+    v = calibration.apply_calibration(m_inst, calibration_fit, color)
     truth_v = np.asarray(green["v_jkc_mag"], dtype=float)
     residual = (v - truth_v)[matched]
     assert np.nanstd(residual) < 0.02
@@ -180,7 +180,7 @@ REQUIRED_COLUMNS = (
     "path", "frame", "layout", "model", "unit", "telescope", "date_obs",
     "n_exp", "exptime", "total_exptime", "airmass", "pixscale",
     "n_sources", "n_green", "n_matched", "n_cal",
-    "zeropoint", "zeropoint_err", "colour_term", "colour_term_err", "colour0",
+    "zeropoint", "zeropoint_err", "color_term", "color_term_err", "color0",
     "rms", "chi2_red", "v_lim_5sigma", "v_lim_100sigma", "v_sat", "sigma_aper",
     "fwhm_R", "fwhm_G", "fwhm_B", "aperture_R", "aperture_G", "aperture_B",
     "sky_R", "sky_G", "sky_B", "sky_pedestal", "bg_poly", "bg_resid_std",
@@ -225,23 +225,23 @@ def test_onboard_quality_lifted_from_crowdsky_header(mef_frame, cube_frame):
 def test_explicit_reference_band_recovers_known_red_transformation(extraction):
     sources = extraction.sources.copy()
     red = np.asarray(sources["band"]) == "R"
-    colour = np.asarray(sources["b_jkc_mag"]) - np.asarray(sources["r_jkc_mag"])
+    color = np.asarray(sources["b_jkc_mag"]) - np.asarray(sources["r_jkc_mag"])
     inst = -2.5 * np.log10(np.asarray(sources["flux"]))
-    sources["r_ref"] = inst + 23.0 + 0.17 * colour
+    sources["r_ref"] = inst + 23.0 + 0.17 * color
     cal = calibration.fit_zeropoint(
         sources, band="R", reference_mag="r_ref", mag_range=None,
-        colour_columns=("b_jkc_mag", "r_jkc_mag"), reference_system="SDSS r (AB)",
+        color_columns=("b_jkc_mag", "r_jkc_mag"), reference_system="SDSS r (AB)",
     )
-    assert cal.colour_term == pytest.approx(0.17, abs=1e-10)
+    assert cal.color_term == pytest.approx(0.17, abs=1e-10)
     assert cal.reference_mag == "r_ref"
     assert cal.reference_system == "SDSS r (AB)"
-    recovered = calibration.apply_calibration(inst[red], cal, colour[red])
+    recovered = calibration.apply_calibration(inst[red], cal, color[red])
     np.testing.assert_allclose(recovered, sources["r_ref"][red])
     with pytest.raises(KeyError):
         calibration.fit_zeropoint(sources, band="R", reference_mag="missing_r")
 
 
-def test_custom_colour_and_nonfinite_calibrators(extraction):
+def test_custom_color_and_nonfinite_calibrators(extraction):
     sources = extraction.sources.copy()
     sources["gr"] = np.asarray(sources["bp_rp"])
     sources["r_ref"] = np.asarray(sources["v_jkc_mag"])
@@ -249,12 +249,12 @@ def test_custom_colour_and_nonfinite_calibrators(extraction):
     sources["r_ref"][red[0]] = np.nan
     sources["gr"][red[1]] = np.inf
     cal = calibration.fit_zeropoint(
-        sources, band="R", reference_mag="r_ref", colour_columns="gr"
+        sources, band="R", reference_mag="r_ref", color_columns="gr"
     )
     assert np.isfinite(cal.zeropoint)
-    assert cal.colour_label == "gr"
+    assert cal.color_label == "gr"
     constant = calibration.fit_zeropoint(
-        sources, band="R", reference_mag="r_ref", colour_columns=()
+        sources, band="R", reference_mag="r_ref", color_columns=()
     )
-    assert constant.colour_term == 0
+    assert constant.color_term == 0
     assert constant.reference_system == "r_ref"

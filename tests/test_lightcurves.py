@@ -137,19 +137,19 @@ def test_missing_exptime_does_not_shift_the_epoch():
 # --- comparison selection --------------------------------------------------------------
 
 def test_select_comparisons_excludes_the_target(stars):
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     assert TARGET_ID not in np.asarray(comps["source_id"])
 
 
 def test_select_comparisons_magnitude_cut(stars):
-    comps = lightcurves.select_comparisons(stars, dmag=0.3, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=0.3, color_tol=None)
     target_mag = float(stars["v_jkc_mag"][0])
     assert np.all(np.abs(np.asarray(comps["v_jkc_mag"]) - target_mag) <= 0.3)
 
 
 def test_select_comparisons_separation_cut(stars):
     comps = lightcurves.select_comparisons(
-        stars, dmag=None, colour_tol=None, max_sep_arcmin=10
+        stars, dmag=None, color_tol=None, max_sep_arcmin=10
     )
     assert np.all(np.asarray(comps["sep_target_arcmin"]) <= 10)
 
@@ -159,7 +159,7 @@ def test_select_comparisons_drops_variables(stars):
     flag = np.asarray(stars["phot_variable_flag"]).astype("U20")
     flag[3] = "VARIABLE"
     stars["phot_variable_flag"] = flag
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     assert int(stars["source_id"][3]) not in np.asarray(comps["source_id"])
 
 
@@ -167,20 +167,20 @@ def test_target_id_of_reads_the_flag(stars):
     assert lightcurves.target_id_of(stars) == TARGET_ID
 
 
-def test_build_stars_flags_an_explicit_target(catalogue):
+def test_build_stars_flags_an_explicit_target(catalog):
     stars = lightcurves.build_stars(
-        catalogue, catalogue["source_id"], (FIELD_RA, FIELD_DEC),
-        target_id=int(catalogue["source_id"][5]),
+        catalog, catalog["source_id"], (FIELD_RA, FIELD_DEC),
+        target_id=int(catalog["source_id"][5]),
     )
     flagged = stars[np.asarray(stars["is_target"])]
     assert len(flagged) == 1
-    assert int(flagged["source_id"][0]) == int(catalogue["source_id"][5])
+    assert int(flagged["source_id"][0]) == int(catalog["source_id"][5])
 
 
-def test_build_stars_rejects_an_unmeasured_target(catalogue):
+def test_build_stars_rejects_an_unmeasured_target(catalog):
     with pytest.raises(ValueError, match="not measured"):
         lightcurves.build_stars(
-            catalogue, catalogue["source_id"], (FIELD_RA, FIELD_DEC),
+            catalog, catalog["source_id"], (FIELD_RA, FIELD_DEC),
             target_id=999999,
         )
 
@@ -189,7 +189,7 @@ def test_build_stars_rejects_an_unmeasured_target(catalogue):
 
 def test_differential_removes_the_transparency_drift(measurements, stars):
     """A 0.35 mag drift must not survive into the light curve."""
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(measurements, TARGET_ID, comps)
     assert len(lc) == N_FRAMES
     # The injected sinusoid has amplitude 0.08, so the scatter should be ~0.057
@@ -201,7 +201,7 @@ def test_differential_removes_the_transparency_drift(measurements, stars):
 
 
 def test_differential_recovers_the_injected_period(measurements, stars):
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(measurements, TARGET_ID, comps)
     pg = lightcurves.periodogram(lc, min_period=0.05, max_period=0.3)
     assert pg["best_period"] == pytest.approx(PERIOD, rel=0.02)
@@ -209,7 +209,7 @@ def test_differential_recovers_the_injected_period(measurements, stars):
 
 
 def test_differential_recovers_the_injected_amplitude(measurements, stars):
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(measurements, TARGET_ID, comps)
     dmag = np.asarray(lc["dmag"])
     # Peak-to-peak of a sine is 2A; allow for sampling not hitting the extremes.
@@ -219,20 +219,20 @@ def test_differential_recovers_the_injected_amplitude(measurements, stars):
 def test_constant_star_gives_a_flat_curve(stars):
     """The precision floor test: no injected signal must give scatter at the noise."""
     meas = synthetic_measurements(amplitude=0.0)
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(meas, TARGET_ID, comps)
     assert np.std(np.asarray(lc["dmag"])) < 3 * NOISE
 
 
 def test_comparison_dropout_does_not_shift_the_zeropoint(stars):
-    """Referencing each comparison to its own catalogue magnitude is what buys this.
+    """Referencing each comparison to its own catalog magnitude is what buys this.
 
     A comparison vanishing halfway through must not step the ensemble zero point --
     with a mean-flux-ratio ensemble it would, and the light curve would show a
     discontinuity exactly at the dropout.
     """
     meas = synthetic_measurements(amplitude=0.0, dropout=4)
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(meas, TARGET_ID, comps)
     dmag = np.asarray(lc["dmag"])
     half = len(dmag) // 2
@@ -243,13 +243,13 @@ def test_comparison_dropout_does_not_shift_the_zeropoint(stars):
 
 
 def test_min_comp_drops_underpopulated_frames(measurements, stars):
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)[:2]
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)[:2]
     lc = lightcurves.differential_lightcurve(measurements, TARGET_ID, comps, min_comp=3)
     assert len(lc) == 0
 
 
 def test_lightcurve_reports_the_ensemble_size(measurements, stars):
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(measurements, TARGET_ID, comps)
     assert np.all(np.asarray(lc["n_comp"]) == len(comps))
     assert lc.meta["n_comp_pool"] == len(comps)
@@ -262,7 +262,7 @@ def test_flagged_comparisons_shrink_the_ensemble(stars):
         np.asarray(meas["source_id"]), [3, 4]
     )
     meas["flag"][bad] = 1
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(meas, TARGET_ID, comps, max_flag=0)
     assert len(lc) == N_FRAMES                       # the frame is kept
     n_comp = dict(zip(np.asarray(lc["frame"]), np.asarray(lc["n_comp"])))
@@ -277,7 +277,7 @@ def test_flagging_the_target_drops_the_frame(stars):
         np.asarray(meas["source_id"]) == TARGET_ID
     )
     meas["flag"][bad] = 1
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(meas, TARGET_ID, comps, max_flag=0)
     assert len(lc) == N_FRAMES - 1
     assert "frame_010" not in np.asarray(lc["frame"])
@@ -286,7 +286,7 @@ def test_flagging_the_target_drops_the_frame(stars):
 # --- the per-comparison diagnostic -----------------------------------------------------
 
 def test_comparison_curves_cover_every_comparison(measurements, stars):
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     curves = lightcurves.comparison_curves(measurements, comps)
     assert set(curves) == set(int(s) for s in comps["source_id"])
 
@@ -294,7 +294,7 @@ def test_comparison_curves_cover_every_comparison(measurements, stars):
 def test_comparison_curves_expose_a_rogue_star(stars):
     """The check that earns its keep: a variable comparison must stand out."""
     meas = synthetic_measurements(amplitude=0.0, rogue=5)
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     curves = lightcurves.comparison_curves(meas, comps)
     scatter = {sid: float(np.std(np.asarray(lc["dmag"]))) for sid, lc in curves.items()}
     worst = max(scatter, key=scatter.get)
@@ -306,7 +306,7 @@ def test_comparison_curves_expose_a_rogue_star(stars):
 # --- period tools ---------------------------------------------------------------------
 
 def test_phase_fold_wraps_into_unit_interval(measurements, stars):
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(measurements, TARGET_ID, comps)
     phase, mag = lightcurves.phase_fold(lc, PERIOD)
     assert phase.min() >= 0.0 and phase.max() < 1.0

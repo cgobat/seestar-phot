@@ -16,7 +16,7 @@ A minimal session::
     frames = pipeline.build_frame_table(proj, diagnostics=3)    # frames.ecsv + figures
     stars, meas = pipeline.build_measurements(proj)             # the two LC tables
 
-    comps = lightcurves.select_comparisons(stars, dmag=1.0, colour_tol=0.3)
+    comps = lightcurves.select_comparisons(stars, dmag=1.0, color_tol=0.3)
     lc = lightcurves.differential_lightcurve(meas, lightcurves.target_id_of(stars), comps)
 
 See ``CLAUDE.md`` for the conventions and ``docs/`` for why each numerical choice is

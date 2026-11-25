@@ -12,15 +12,15 @@ units and 24 from three S50 Pro units, all from `D:\seestar_saturation_data_set`
 ## What is fitted, and against what
 
 A passband here is the sensor's quantum efficiency times a UV/IR-cut filter model. The QE
-comes from the manufacturer's plot, digitised by colour-masking; the filter is never
+comes from the manufacturer's plot, digitised by color-masking; the filter is never
 published for any of these units, so it is **fitted from the photometry**. Calibrate each
 Bayer plane against a synthetic magnitude computed at a trial filter, measure the slope of
-the zero-point residual against colour, and take the value where that slope crosses zero.
+the zero-point residual against color, and take the value where that slope crosses zero.
 
-The colour axis is Gaia BP−RP, and on these units it is **synthesised from the same XP
+The color axis is Gaia BP−RP, and on these units it is **synthesised from the same XP
 spectra** as the reference magnitudes, because `bp_rp` lives only in `gaia_source` and is
-masked in the offline all-sky catalogue. Checked against real Gaia colours for 12,948
-stars in this field, the synthetic colour agrees to **0.0102 mag** scatter about a
+masked in the offline all-sky catalog. Checked against real Gaia colors for 12,948
+stars in this field, the synthetic color agrees to **0.0102 mag** scatter about a
 constant −0.351 offset, which is just AB−Vega. A constant cannot move a zero crossing, and
 neither can a scale error, so the fitted edge is insensitive to both.
 
@@ -36,7 +36,7 @@ crossed zero 1 nm apart. On both new units they do not.
 | S50 Pro | 708.5 nm | 684.9 nm | **23.5 nm** |
 
 There is one filter, so both planes must be fitted by one edge — and at the compromise
-value (their mean) each plane is left with a residual colour term of about **+0.027 in G
+value (their mean) each plane is left with a residual color term of about **+0.027 in G
 and −0.026 in R mag/mag**, equal and opposite. That is a model failure, not a measurement.
 
 Two things were ruled out before changing the model:
@@ -68,7 +68,7 @@ touches the band's core. This is the same correction the S50 already needed for 
 | **S50 Pro** (OS08B10) | **684.9 nm** | **×1.644** | **×2.043** |
 
 Blue edge 390 nm, 10–90% width 15 nm, peak 0.97, as for the S50. After fitting, every
-residual colour term on every plane of every unit is zero to ±0.001 mag/mag.
+residual color term on every plane of every unit is zero to ±0.001 mag/mag.
 
 ```{figure} figures/unit-passbands.png
 :alt: Total-system passbands for the S50, S30 Pro and S50 Pro, with each fitted IR-cut edge marked.
@@ -81,9 +81,9 @@ blue response under the red plane.
 ## The control
 
 Everything above rests on the pipeline being trustworthy, so it was run on the S50 first —
-the same code, the same offline catalogue, the same synthesised colour, on the 15-minute
+the same code, the same offline catalog, the same synthesised color, on the 15-minute
 local stacks the published S50 fit used. The published values came from a different script
-in a different repository, against a TAP catalogue and real Gaia colours.
+in a different repository, against a TAP catalog and real Gaia colors.
 
 | | this pipeline | published |
 |---|---|---|
@@ -142,6 +142,6 @@ photometry work, not as a claim about the physical filter. They are fitted on on
 one airmass range, and the two S30 Pro units and three S50 Pro units were not fitted
 separately, so a unit-to-unit spread is not yet known.
 
-**Nothing here is in the catalogue.** `gaiadb` carries `r/g/b_s50_mag` only. Adding
+**Nothing here is in the catalog.** `gaiadb` carries `r/g/b_s50_mag` only. Adding
 `*_s30pro` and `*_s50pro` columns means another schema version and another pass over the
 114 GB of bulk XP spectra; `tools/build_gaia_s50.py` is the tool that would do it.

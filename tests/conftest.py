@@ -5,10 +5,10 @@ positions onto a noisy pedestal, in both FITS layouts and with a deliberately
 chromatic PSF (R and B broader than G, as the real optics are). Because the truth is
 known, the tests can assert recovery rather than merely "it ran".
 
-The synthetic catalogue is generated *from* the injected fluxes through the exact
+The synthetic catalog is generated *from* the injected fluxes through the exact
 calibration relation the pipeline fits::
 
-    V = m_inst + ZP + k * (colour - colour0)
+    V = m_inst + ZP + k * (color - color0)
 
 so :func:`calibration.fit_zeropoint` must recover ``ZP_TRUE`` and ``K_TRUE``, and any
 change that breaks that relation shows up immediately.
@@ -44,7 +44,7 @@ def expected_zeropoint(enclosed=0.90):
 
     That absorption is the designed behaviour, not an error: because every band is
     sized to the *same* fraction, the offset is identical across bands, so it cancels
-    in colours and disappears into the per-frame zero point. This helper is what the
+    in colors and disappears into the per-frame zero point. This helper is what the
     tests assert against, so the relationship is pinned rather than rediscovered.
     """
     return ZP_TRUE + 2.5 * np.log10(enclosed)
@@ -70,27 +70,27 @@ def star_grid():
 
 
 def truth_table():
-    """One row per injected star: position, reference V, colour, and per-band flux.
+    """One row per injected star: position, reference V, color, and per-band flux.
 
-    Magnitudes span 10-14 (the default fit window) and colours 0.4-1.6, so the
-    zero-point fit has real leverage on the colour term rather than fitting noise.
+    Magnitudes span 10-14 (the default fit window) and colors 0.4-1.6, so the
+    zero-point fit has real leverage on the color term rather than fitting noise.
     """
     x, y = star_grid()
     n = len(x)
     rng = np.random.default_rng(20260803)
     v = np.linspace(10.2, 13.8, n)
-    colour = 0.4 + 1.2 * rng.random(n)
+    color = 0.4 + 1.2 * rng.random(n)
 
     # Invert the calibration relation to get the green flux each star must have.
-    m_inst_g = v - ZP_TRUE - K_TRUE * (colour - np.median(colour))
+    m_inst_g = v - ZP_TRUE - K_TRUE * (color - np.median(color))
     flux_g = 10.0 ** (-m_inst_g / 2.5)
-    # R and B carry the colour: B - R = colour, split symmetrically about green so the
-    # instrumental colour test has something real to recover.
-    flux_r = flux_g * 10.0 ** (0.5 * colour / 2.5)
-    flux_b = flux_g * 10.0 ** (-0.5 * colour / 2.5)
+    # R and B carry the color: B - R = color, split symmetrically about green so the
+    # instrumental color test has something real to recover.
+    flux_r = flux_g * 10.0 ** (0.5 * color / 2.5)
+    flux_b = flux_g * 10.0 ** (-0.5 * color / 2.5)
 
     return Table({
-        "x": x, "y": y, "v": v, "colour": colour,
+        "x": x, "y": y, "v": v, "color": color,
         "flux_R": flux_r, "flux_G": flux_g, "flux_B": flux_b,
     })
 
@@ -218,26 +218,26 @@ def write_wcs_sidecar(frame_path):
     return cache
 
 
-def make_catalogue(truth=None):
-    """A reference catalogue matching the injected stars, in Gaia column names."""
+def make_catalog(truth=None):
+    """A reference catalog matching the injected stars, in Gaia column names."""
     truth = truth_table() if truth is None else truth
     w = make_wcs()
     ra, dec = w.all_pix2world(
         np.asarray(truth["x"]), np.asarray(truth["y"]), 0
     )
     v = np.asarray(truth["v"], dtype=float)
-    colour = np.asarray(truth["colour"], dtype=float)
+    color = np.asarray(truth["color"], dtype=float)
     return Table({
         "source_id": np.arange(1, len(truth) + 1, dtype=np.int64),
         "ra": ra, "dec": dec,
         "phot_g_mean_mag": v,
-        "phot_bp_mean_mag": v + 0.5 * colour,
-        "phot_rp_mean_mag": v - 0.5 * colour,
-        "bp_rp": colour,
+        "phot_bp_mean_mag": v + 0.5 * color,
+        "phot_rp_mean_mag": v - 0.5 * color,
+        "bp_rp": color,
         "phot_variable_flag": np.array(["NOT_AVAILABLE"] * len(truth)),
         "v_jkc_mag": v,
-        "b_jkc_mag": v + 0.5 * colour,
-        "r_jkc_mag": v - 0.5 * colour,
+        "b_jkc_mag": v + 0.5 * color,
+        "r_jkc_mag": v - 0.5 * color,
     })
 
 
@@ -254,8 +254,8 @@ def cube(truth):
 
 
 @pytest.fixture(scope="session")
-def catalogue(truth):
-    return make_catalogue(truth)
+def catalog(truth):
+    return make_catalog(truth)
 
 
 @pytest.fixture(scope="session")
@@ -286,12 +286,12 @@ def mef_frame(tmp_path_factory, cube):
 
 
 @pytest.fixture(scope="session")
-def extraction(cube_frame, catalogue, wcs):
+def extraction(cube_frame, catalog, wcs):
     """A cross-matched extraction of the native frame."""
     from seestar_photometry import photometry
 
     ext = photometry.extract_sources(cube_frame)
-    ext.match_gaia(catalogue, wcs=wcs)
+    ext.match_gaia(catalog, wcs=wcs)
     return ext
 
 
@@ -350,7 +350,7 @@ def lc_bundle():
 
     meas = synthetic_measurements(rogue=5)
     stars = synthetic_stars()
-    comps = lightcurves.select_comparisons(stars, dmag=None, colour_tol=None)
+    comps = lightcurves.select_comparisons(stars, dmag=None, color_tol=None)
     lc = lightcurves.differential_lightcurve(
         meas, int(stars["source_id"][0]), comps
     )

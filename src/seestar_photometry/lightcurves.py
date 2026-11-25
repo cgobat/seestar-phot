@@ -3,7 +3,7 @@
 The data model is two tables, built by :mod:`pipeline`:
 
 ``stars.ecsv``
-    One row per catalogue source in the field -- position, magnitudes, colour,
+    One row per catalog source in the field -- position, magnitudes, color,
     variability flag, separation from the target. The small table you *query* to pick
     a comparison ensemble.
 
@@ -14,15 +14,15 @@ The data model is two tables, built by :mod:`pipeline`:
 Two choices make the <1% floor reachable and are worth understanding before
 changing anything here:
 
-**Forced photometry, not detect-then-match.** Every catalogue position is measured in
+**Forced photometry, not detect-then-match.** Every catalog position is measured in
 every frame whether or not a source was detected there. A star therefore keeps a row
 in every frame it lands on, so series never go ragged and the comparison ensemble is
 *identical* frame to frame. With detect-then-match, a faint comparison drops out
 exactly on the frames where conditions were poor -- precisely when you need it -- and
 the ensemble composition changes underneath the light curve.
 
-**Each comparison referenced to its own catalogue magnitude.** The per-frame zero
-point is the mean over comparisons of ``(catalogue mag - instrumental mag)``, not a
+**Each comparison referenced to its own catalog magnitude.** The per-frame zero
+point is the mean over comparisons of ``(catalog mag - instrumental mag)``, not a
 mean flux ratio. That way a comparison dropping in or out between frames does not
 shift the zero point, and the scatter of the per-comparison zero points is the
 genuine measurement error rather than the intrinsic brightness spread of the
@@ -112,7 +112,7 @@ def frame_times(header, target, total_exptime=None):
     }
 
 
-#: Catalogue columns carried into the stars table.
+#: Catalog columns carried into the stars table.
 STAR_COLUMNS = (
     "source_id", "ra", "dec",
     "phot_g_mean_mag", "phot_bp_mean_mag", "phot_rp_mean_mag", "bp_rp",
@@ -120,8 +120,8 @@ STAR_COLUMNS = (
 )
 
 
-def build_stars(catalogue, source_ids, target_radec, target_id=None):
-    """One row per catalogue source that was measured, with separation from the target.
+def build_stars(catalog, source_ids, target_radec, target_id=None):
+    """One row per catalog source that was measured, with separation from the target.
 
     The nearest source to ``target_radec`` is flagged ``is_target`` unless an explicit
     ``target_id`` is given. Prefer passing ``target_id`` when you know it: "nearest to
@@ -132,8 +132,8 @@ def build_stars(catalogue, source_ids, target_radec, target_id=None):
     from astropy.coordinates import SkyCoord
     from astropy.table import Table
 
-    present = np.isin(np.asarray(catalogue["source_id"]), np.asarray(source_ids))
-    sub = catalogue[present]
+    present = np.isin(np.asarray(catalog["source_id"]), np.asarray(source_ids))
+    sub = catalog[present]
     stars = Table()
     for col in dict.fromkeys((*STAR_COLUMNS, *sub.colnames)):
         if col in sub.colnames:
@@ -173,7 +173,7 @@ def target_id_of(stars):
 
 def select_comparisons(
     stars, target_id=None, max_sep_arcmin=None, dmag=1.0, mag_range=None,
-    colour_tol=0.3, exclude_variable=True, mag_col="v_jkc_mag", colour_col="bp_rp",
+    color_tol=0.3, exclude_variable=True, mag_col="v_jkc_mag", color_col="bp_rp",
 ):
     """Choose comparison-star ``source_id``\\ s from the stars table.
 
@@ -183,10 +183,10 @@ def select_comparisons(
       field rotation, so the position-dependent aperture loss largely cancels;
     * **similar brightness** -- similar noise, and away from both saturation and the
       detection floor;
-    * **similar colour** -- minimises differential-extinction and colour-term
+    * **similar color** -- minimises differential-extinction and color-term
       residuals;
 
-    and drops catalogue-flagged variables. All cuts are optional; pass ``None`` to
+    and drops catalog-flagged variables. All cuts are optional; pass ``None`` to
     skip one.
 
     A larger ensemble is not automatically better: adding faint or distant stars adds
@@ -206,9 +206,9 @@ def select_comparisons(
         keep &= (mag >= min(mag_range)) & (mag <= max(mag_range))
     elif dmag is not None:
         keep &= np.abs(mag - float(tgt[mag_col])) <= dmag
-    if colour_tol is not None and colour_col in stars.colnames:
-        col = np.asarray(stars[colour_col], dtype=float)
-        keep &= np.isfinite(col) & (np.abs(col - float(tgt[colour_col])) <= colour_tol)
+    if color_tol is not None and color_col in stars.colnames:
+        col = np.asarray(stars[color_col], dtype=float)
+        keep &= np.isfinite(col) & (np.abs(col - float(tgt[color_col])) <= color_tol)
     if max_sep_arcmin is not None and "sep_target_arcmin" in stars.colnames:
         keep &= np.asarray(stars["sep_target_arcmin"], dtype=float) <= max_sep_arcmin
     if exclude_variable and "phot_variable_flag" in stars.colnames:
@@ -224,10 +224,10 @@ def differential_lightcurve(
     """Ensemble differential light curve of one target in one band.
 
     Each frame gets an **ensemble zero point** -- the mean, over its valid comparison
-    stars, of ``(catalogue mag - instrumental mag)``. The target's calibrated
+    stars, of ``(catalog mag - instrumental mag)``. The target's calibrated
     magnitude in that frame is ``m_target + ensemble ZP``. This removes the per-frame
     transparency (common to target and comparisons, so it cancels) *and* ties the
-    target to the comparisons' catalogue scale in one step.
+    target to the comparisons' catalog scale in one step.
 
     Only valid measurements are used: on chip, finite magnitude, SEP ``flag <=
     max_flag``.
@@ -240,11 +240,11 @@ def differential_lightcurve(
         Target ``source_id``.
     comps : astropy.table.Table
         Comparison stars from :func:`select_comparisons`; needs ``source_id`` and the
-        ``cat_mag_col`` catalogue magnitude.
+        ``cat_mag_col`` catalog magnitude.
     band : str
         Band to build the curve in (``"G"`` ~ Johnson V).
     time_col, inst_col, cat_mag_col : str
-        Time, instrumental-magnitude and catalogue-magnitude columns.
+        Time, instrumental-magnitude and catalog-magnitude columns.
     min_comp : int
         Minimum valid comparisons required to keep a frame. Below ~3 the ensemble
         zero point is not averaging anything and its error is unmeasurable.
@@ -291,7 +291,7 @@ def differential_lightcurve(
         ti = np.where(t_sel)[0][0]
         tgt_err = float(m["mag_err"][ti]) if "mag_err" in m.colnames else 0.0
         # Error on the *mean* zero point, not the spread of the ensemble: the spread
-        # is dominated by how well each comparison's catalogue magnitude is known.
+        # is dominated by how well each comparison's catalog magnitude is known.
         zp_scatter = float(np.std(zp, ddof=1)) if len(zp) > 1 else 0.0
         zp_err = zp_scatter / np.sqrt(len(zp)) if len(zp) > 1 else 0.0
         rows.append((

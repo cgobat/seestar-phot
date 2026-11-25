@@ -21,7 +21,7 @@ curve of MW Cam and a Type II supernova in NGC 3310 — and encodes what those n
   CrowdSky multi-extension frames. They load to one array shape, and the two conflicting
   header dialects are resolved for you.
 - **A per-frame, per-band aperture**, because the Seestar's PSF is chromatic and a shared
-  radius biases every colour.
+  radius biases every color.
 - **A re-solved WCS**, because the on-board one is off by ~1 arcminute and useless for
   photometry.
 - **Ensemble differential photometry** that stays honest when comparison stars come and go.

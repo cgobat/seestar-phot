@@ -5,7 +5,7 @@ One digitiser for all three Seestar sensors, because the alternative is three
 hand-tuned copies that drift apart. Each plot is described by a :class:`Plot` entry
 saying how to find its axes and what they mean; everything after that is shared.
 
-The curves are the only saturated colours in these figures, so a colour mask per
+The curves are the only saturated colors in these figures, so a color mask per
 channel recovers each one to about a pixel. Two things make that harder than it sounds
 and both are handled here:
 
@@ -45,7 +45,7 @@ OUT_FIG = HERE / "sensor_qe" / "digitisation_check.png"
 WL_GRID = np.arange(330.0, 1021.0, 2.0)
 
 #: Refuse a channel that is invisible over more than this fraction of the plot's width.
-#: Occlusion and cursors cost a few percent; a broken colour mask costs most of it, and
+#: Occlusion and cursors cost a few percent; a broken color mask costs most of it, and
 #: the difference matters because both look like "some NaNs" from the inside.
 MAX_GAP_FRACTION = 0.25
 
@@ -64,7 +64,7 @@ class Plot:
     calibration: str
     #: Expected (n_columns, n_rows) for "grid"; the count is the check that it worked.
     grid_shape: tuple = ()
-    #: Fraction of a row or column that must be grid-coloured to count as a gridline.
+    #: Fraction of a row or column that must be grid-colored to count as a gridline.
     #: Per figure because a soft JPEG grid never reaches the fraction a crisp PNG does,
     #: and the count check above is what says the chosen value was right.
     grid_fraction: float = 0.75
@@ -102,7 +102,7 @@ PLOTS = (
         nir_fill={"R": "B", "G": "B"}, nir_from=830.0,
         notes="Sony IMX585, the S30 Pro, from the ZWO ASI585 datasheet plot. The "
               "screenshot caught a mouse cursor over the green peak near 520 nm; it "
-              "occludes the curve rather than recolouring it, so it reads as a gap.",
+              "occludes the curve rather than recoloring it, so it reads as a gap.",
     ),
     Plot(
         name="os08b10", image="os08b10_qe.png",
@@ -193,7 +193,7 @@ def _stroke(rows):
 
     Taking the median of *every* masked pixel in the column looks equivalent and is not.
     Where a curve is hidden under another, what survives the mask is not the curve but
-    whatever else happens to be that colour -- on the OmniVision screenshot, specks left
+    whatever else happens to be that color -- on the OmniVision screenshot, specks left
     along the axis where the grid was erased. Those are near QE = 0, so the column reads
     zero and the curve acquires a spike straight down to the axis. Every such spike in
     that figure sat above 800 nm, where all three curves overlap.
@@ -277,7 +277,7 @@ def digitise(plot, images=IMAGES):
         if missing.mean() > MAX_GAP_FRACTION:
             raise RuntimeError(
                 f"{plot.name} {channel}: {100*missing.mean():.0f}% of the plot width has "
-                "no pixels of that colour -- the mask or the calibration is wrong")
+                "no pixels of that color -- the mask or the calibration is wrong")
         ok = ~missing
         curves[channel] = np.clip(
             np.interp(np.arange(len(values)), np.flatnonzero(ok), values[ok]), 0.0, None)
@@ -424,7 +424,7 @@ def main():
         meta.append(f"{plot.name}: {plot.notes}")
 
     table.meta["comments"] = [
-        "Sensor quantum efficiency, digitised from datasheet plots by colour-masking,",
+        "Sensor quantum efficiency, digitised from datasheet plots by color-masking,",
         "as a fraction (not percent), resampled onto a common 330-1020 nm, 2 nm grid.",
         "Values outside each figure's plotted range are held at the edge value.",
         *meta,

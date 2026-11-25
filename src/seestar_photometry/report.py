@@ -101,7 +101,7 @@ def frame_report(frame, extraction, cal, outdir, prefix=None):
     _panel(plots.fwhm_bands, outdir, f"{prefix}_fwhm", written, fwhm=extraction.fwhm)
     _panel(plots.reference_vs_instrumental, outdir, f"{prefix}_zp_relation", written,
            cal=cal)
-    _panel(plots.zeropoint_vs_colour, outdir, f"{prefix}_zp_colour", written, cal=cal)
+    _panel(plots.zeropoint_vs_color, outdir, f"{prefix}_zp_color", written, cal=cal)
     for against in ("v", "snr", "radius"):
         _panel(plots.residual_vs, outdir, f"{prefix}_residual_{against}", written,
                cal=cal, against=against)
@@ -111,7 +111,7 @@ def frame_report(frame, extraction, cal, outdir, prefix=None):
            sources=extraction.sources)
     _panel(plots.match_separation, outdir, f"{prefix}_match_sep", written,
            sources=extraction.sources)
-    _panel(plots.instrumental_colour, outdir, f"{prefix}_colour_fidelity", written,
+    _panel(plots.instrumental_color, outdir, f"{prefix}_color_fidelity", written,
            sources=extraction.sources)
     _panel(plots.detection_overlay, outdir, f"{prefix}_detections", written,
            frame=frame, extraction=extraction, half=250)
@@ -137,7 +137,7 @@ def sample_frame_reports(project, n=3, keys=None):
     """
     from . import astrometry, calibration, frames, photometry
 
-    catalogue = project.catalogue()
+    catalog = project.catalog()
     keys = keys if keys is not None else project.frames()
     written = []
     made = 0
@@ -153,7 +153,7 @@ def sample_frame_reports(project, n=3, keys=None):
             ext = photometry.extract_sources(
                 frame, thresh=project.thresh, enclosed=project.enclosed_characterise
             )
-            ext.match_gaia(catalogue, wcs=wcs, tol_arcsec=project.match_tol_arcsec)
+            ext.match_gaia(catalog, wcs=wcs, tol_arcsec=project.match_tol_arcsec)
             cal = calibration.fit_zeropoint(
                 ext.sources, band="G", mag_range=project.fit_mag_range
             )
@@ -251,7 +251,7 @@ def measurements_report(stars, measurements, outdir, project=None, band="G"):
                 color=_style.CATEGORICAL[0])
         ax.set_xlabel("frame index (alphabetical)")
         ax.set_ylabel("sources measured")
-        ax.set_title(f"Catalogue sources per frame ({len(frame_names)} frames)")
+        ax.set_title(f"Catalog sources per frame ({len(frame_names)} frames)")
         _save(fig, outdir, "measurements_sources_per_frame", written)
     except Exception as exc:
         print(f"[report] sources-per-frame failed: {exc!r}", flush=True)

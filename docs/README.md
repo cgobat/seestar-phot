@@ -24,8 +24,8 @@ you need to know what was already ruled out.
 1. **The Seestar PSF is chromatic** — R and B are measurably broader than green, and the
    broadening tracks auto-focus. Hence a per-band aperture sized to a common *fraction*
    rather than a common radius. → [photometry-design.md](photometry-design.md)
-2. **The on-board WCS is off by ~1 arcmin**, which drops the catalogue match rate to a few
+2. **The on-board WCS is off by ~1 arcmin**, which drops the catalog match rate to a few
    percent. Every frame is re-solved and cached. → [astrometry-and-gaia.md](astrometry-and-gaia.md)
-3. **Each comparison must be referenced to its own catalogue magnitude**, not to an ensemble
+3. **Each comparison must be referenced to its own catalog magnitude**, not to an ensemble
    mean flux. That is what makes a changing ensemble harmless and makes the per-comparison
    scatter a real error estimate. → [light-curves.md](light-curves.md)

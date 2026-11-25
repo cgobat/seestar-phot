@@ -161,7 +161,7 @@ def test_bayer_pattern_orientation_is_right():
 
     The two green sub-lattices must agree closely, while red and blue do not -- that is
     what proves green sits on (0,0)+(1,1) and there is no row flip. A wrong phase would
-    swap colour planes and silently ruin every colour term.
+    swap color planes and silently ruin every color term.
     """
     raw = examples.raw_subs(1)[0].bayer
     med = debayer.channel_medians(raw, "GRBG")
@@ -341,7 +341,7 @@ def test_zeropoint_is_recovered(measured):
     assert cal.zeropoint == pytest.approx(23.64, abs=0.15)
     assert cal.rms < 0.05
     assert cal.n_stars > 30
-    assert cal.colour_label == "B-R (JKC)"
+    assert cal.color_label == "B-R (JKC)"
 
 
 def test_two_stacks_of_the_same_unit_agree_on_the_zeropoint(measured):
@@ -427,7 +427,7 @@ def test_crowdsky_onboard_metrics_can_be_cross_checked():
     assert ours_arcsec == pytest.approx(onboard["onboard_fwhm_G_arcsec"], rel=0.15)
 
 
-# --- the catalogue-anchored solver, against the shipped solutions ----------------------
+# --- the catalog-anchored solver, against the shipped solutions ----------------------
 
 #: Bundled frames and the sidecar stem each was solved into, for the solver tests.
 SOLVABLE = {
@@ -455,7 +455,7 @@ def test_local_solve_reproduces_the_shipped_solution(stem, tmp_path):
     """Against ASTAP's answer for the same frame, which is the ground truth here.
 
     The sidecars shipped with the example data came from ASTAP on the full frames, so
-    agreeing with them to a fraction of a pixel means the catalogue-anchored path is
+    agreeing with them to a fraction of a pixel means the catalog-anchored path is
     doing the same job. Measured worst case over the four frames: 0.37 arcsec, against
     a 2.39 arcsec pixel.
     """
@@ -536,7 +536,7 @@ def test_pipeline_runs_end_to_end_on_bundled_frames(tmp_path):
     green = meas[np.asarray(meas["band"]) == "G"]
     counts = np.array([int((np.asarray(green["source_id"]) == s).sum())
                        for s in np.unique(green["source_id"])])
-    # Forced photometry measures every catalogue source that lands in a frame's footprint,
+    # Forced photometry measures every catalog source that lands in a frame's footprint,
     # in every such frame -- so a count is 1, 2 or 3, never 0 and never more than 3. It is
     # not always 3 because the three bundled stacks are different pointings (two c17
     # dithers plus a Zcom20 frame), so their footprints only partly overlap.
@@ -545,7 +545,7 @@ def test_pipeline_runs_end_to_end_on_bundled_frames(tmp_path):
     assert (counts == 3).sum() > 50
 
     comps = lightcurves.select_comparisons(
-        stars, mag_range=(10.0, 14.0), colour_tol=None, max_sep_arcmin=None
+        stars, mag_range=(10.0, 14.0), color_tol=None, max_sep_arcmin=None
     )
     assert len(comps) > 10
     lc = lightcurves.differential_lightcurve(

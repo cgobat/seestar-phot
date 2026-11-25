@@ -200,7 +200,7 @@ plus band-suffixed calibration/depth columns such as `zeropoint_R`,
 primary reference. Existing dataset-level V diagnostic/depth-model functions
 remain V-specific; do not use them to interpret an R-only table.
 
-Camera channels are not standard filters. Colour fits require suitable reference
+Camera channels are not standard filters. Color fits require suitable reference
 stars spanning the relevant range and must be validated on held-out stars. Stellar
 transformations need not apply to nonstellar or emission-line spectra. AB/Vega
 labels describe the supplied catalogue; no automatic conversion is performed.

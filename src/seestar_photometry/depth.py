@@ -19,7 +19,7 @@ Caveats, both of which matter before quoting a number:
   co-add frames, so long-exposure values should be validated by actually stacking.
 * ``v_lim_5sigma`` uses empirical source-masked blank-aperture noise on the
   processed image. It is a background-noise threshold at the calibration's
-  fiducial colour, not a source-injection completeness limit. Crowding, source
+  fiducial color, not a source-injection completeness limit. Crowding, source
   Poisson noise, and selection criteria can still change actual recoverability.
 
 """

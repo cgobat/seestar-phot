@@ -92,7 +92,7 @@ def test_snr_floor_is_enforced(extraction):
 
 # --- forced photometry ----------------------------------------------------------------
 
-def test_forced_photometry_recovers_relative_fluxes(cube_frame, catalogue, wcs, truth):
+def test_forced_photometry_recovers_relative_fluxes(cube_frame, catalog, wcs, truth):
     """Fixed-aperture flux must be proportional to injected flux across 4 magnitudes.
 
     Absolute recovery is not expected -- a 90% aperture keeps 90% of the light by
@@ -100,8 +100,8 @@ def test_forced_photometry_recovers_relative_fluxes(cube_frame, catalogue, wcs, 
     flux-dependent ratio is exactly the non-linearity that would break a light curve.
     """
     forced = photometry.forced_photometry(
-        cube_frame, catalogue["ra"], catalogue["dec"], wcs,
-        source_id=catalogue["source_id"],
+        cube_frame, catalog["ra"], catalog["dec"], wcs,
+        source_id=catalog["source_id"],
     )
     green = forced[np.asarray(forced["band"]) == "G"]
     measured = np.asarray(green["flux"], dtype=float)
@@ -120,20 +120,20 @@ def test_forced_photometry_keeps_off_chip_rows(cube_frame, wcs):
     assert list(np.asarray(green["on_chip"])) == [True, False]
 
 
-def test_forced_and_detected_use_the_same_aperture(cube_frame, catalogue, wcs):
+def test_forced_and_detected_use_the_same_aperture(cube_frame, catalog, wcs):
     """If these ever diverge, forced fluxes leave the zero point's photometric system."""
     ext = photometry.extract_sources(cube_frame, enclosed=0.93)
     forced = photometry.forced_photometry(
-        cube_frame, catalogue["ra"], catalogue["dec"], wcs, enclosed=0.93
+        cube_frame, catalog["ra"], catalog["dec"], wcs, enclosed=0.93
     )
     np.testing.assert_allclose(ext.aperture, forced.meta["aperture"], rtol=1e-9)
 
 
-def test_forced_flux_agrees_with_detected_flux(extraction, cube_frame, catalogue, wcs):
-    """Measuring at a catalogue position must match detecting the same star."""
+def test_forced_flux_agrees_with_detected_flux(extraction, cube_frame, catalog, wcs):
+    """Measuring at a catalog position must match detecting the same star."""
     forced = photometry.forced_photometry(
-        cube_frame, catalogue["ra"], catalogue["dec"], wcs,
-        source_id=catalogue["source_id"],
+        cube_frame, catalog["ra"], catalog["dec"], wcs,
+        source_id=catalog["source_id"],
     )
     fg = forced[np.asarray(forced["band"]) == "G"]
     eg = extraction.band("G")

@@ -7,7 +7,7 @@ sheet, or into a saved PNG (see :mod:`report`) without changing.
 Matplotlib is imported lazily inside each function, so ``import seestar_photometry``
 works in a core install with no plotting dependency.
 
-Styling, and in particular the per-band colour/marker/linestyle convention and why
+Styling, and in particular the per-band color/marker/linestyle convention and why
 the secondary encoding is mandatory, lives in :mod:`_style`.
 """
 
@@ -140,42 +140,42 @@ def reference_vs_instrumental(cal, ax=None):
     return ax
 
 
-def zeropoint_vs_colour(cal, ax=None):
-    """Zero-point residual against colour -- the colour-term fit.
+def zeropoint_vs_color(cal, ax=None):
+    """Zero-point residual against color -- the color-term fit.
 
-    The residual ``V - m_inst`` is ``ZP + k*(colour - colour0)``, so this panel *is*
-    the calibration. The fitted line's slope is the colour term, which exists because
+    The residual ``V - m_inst`` is ``ZP + k*(color - color0)``, so this panel *is*
+    the calibration. The fitted line's slope is the color term, which exists because
     the green Bayer channel through IRCUT is not exactly Johnson V. A slope that
-    changes a lot frame to frame means something is varying that a constant colour
+    changes a lot frame to frame means something is varying that a constant color
     term can't absorb -- usually focus, via the chromatic PSF.
     """
     fit = _fit_arrays(cal)
-    if fit["colour"] is None:
+    if fit["color"] is None:
         fig, ax = new_axes(ax)
-        ax.text(0.5, 0.5, "no colour available\n(zero point fit as a clipped mean)",
+        ax.text(0.5, 0.5, "no color available\n(zero point fit as a clipped mean)",
                 ha="center", va="center", transform=ax.transAxes,
                 color=_style.INK_SECONDARY, fontsize=9)
         ax.set_axis_off()
         return ax
 
     fig, ax = new_axes(ax)
-    colour, resid, keep = fit["colour"], fit["residual"], fit["keep"]
-    ax.scatter(colour[~keep], resid[~keep], color=_style.INK_MUTED,
+    color, resid, keep = fit["color"], fit["residual"], fit["keep"]
+    ax.scatter(color[~keep], resid[~keep], color=_style.INK_MUTED,
                label="sigma-clipped", **_CLOUD)
-    ax.scatter(colour[keep], resid[keep], color=_style.BAND_COLOR[cal.band],
+    ax.scatter(color[keep], resid[keep], color=_style.BAND_COLOR[cal.band],
                label="used in fit", **_CLOUD)
-    x = np.linspace(np.nanmin(colour), np.nanmax(colour), 10)
-    ax.plot(x, cal.zeropoint + cal.colour_term * (x - cal.colour0),
-            color=_style.MODEL, lw=1.4, label=f"k = {cal.colour_term:+.3f}")
-    _style.reference_line(ax, cal.colour0, axis="x", label="colour0")
-    ax.set_xlabel(f"colour  {cal.colour_label}")
+    x = np.linspace(np.nanmin(color), np.nanmax(color), 10)
+    ax.plot(x, cal.zeropoint + cal.color_term * (x - cal.color0),
+            color=_style.MODEL, lw=1.4, label=f"k = {cal.color_term:+.3f}")
+    _style.reference_line(ax, cal.color0, axis="x", label="color0")
+    ax.set_xlabel(f"color  {cal.color_label}")
     ax.set_ylabel(f"{cal.reference_system} - instrumental (mag)")
-    ax.set_title("Colour term")
+    ax.set_title("Color term")
     _style.legend(ax, loc="lower left")
     _style.annotate(
         ax,
         f"ZP = {cal.zeropoint:.3f} ± {cal.zeropoint_err:.3f}\n"
-        f"k  = {cal.colour_term:+.3f} ± {cal.colour_term_err:.3f}\n"
+        f"k  = {cal.color_term:+.3f} ± {cal.color_term_err:.3f}\n"
         f"rms = {cal.rms:.3f} mag",
         loc="upper right",
     )
@@ -330,7 +330,7 @@ def background_panels(bg, axes=None):
 
 
 def detection_overlay(frame, extraction, ax=None, matched_only=False, half=None):
-    """The green plane with measured apertures drawn on, and catalogue matches ringed.
+    """The green plane with measured apertures drawn on, and catalog matches ringed.
 
     The direct check that astrometry, detection and cross-match agree. Apertures should
     sit centred on stars, and matched sources should carry a ring; a systematic offset
@@ -372,7 +372,7 @@ def detection_overlay(frame, extraction, ax=None, matched_only=False, half=None)
         facecolors="none", edgecolors=_style.CATEGORICAL[1], linewidths=0.7,
         linestyles="dotted",
     ))
-    ax.set_title("Apertures (green) and catalogue matches (dotted)")
+    ax.set_title("Apertures (green) and catalog matches (dotted)")
     ax.set_xlabel("x (pixels)")
     ax.set_ylabel("y (pixels)")
     ax.grid(visible=False)
@@ -395,7 +395,7 @@ def match_separation(sources, tol_arcsec=2.0, ax=None):
     sep = sep[np.isfinite(sep) & (sep < tol_arcsec * 3)]
     ax.hist(sep, bins=40, color=_style.CATEGORICAL[0], edgecolor=_style.SURFACE, lw=0.6)
     _style.reference_line(ax, tol_arcsec, axis="x", label="match tolerance")
-    ax.set_xlabel("separation to nearest catalogue source (arcsec)")
+    ax.set_xlabel("separation to nearest catalog source (arcsec)")
     ax.set_ylabel("sources")
     ax.set_title("Cross-match quality")
     if len(sep):
@@ -409,12 +409,12 @@ def match_separation(sources, tol_arcsec=2.0, ax=None):
     return ax
 
 
-def instrumental_colour(sources, ax=None):
-    """Instrumental B-R against catalogue B-R, per matched star.
+def instrumental_color(sources, ax=None):
+    """Instrumental B-R against catalog B-R, per matched star.
 
     Tests the per-band aperture directly: since every band encloses the same flux
-    fraction, the aperture correction cancels in a colour, so instrumental colour
-    should track catalogue colour with unit slope and constant offset. Curvature or a
+    fraction, the aperture correction cancels in a color, so instrumental color
+    should track catalog color with unit slope and constant offset. Curvature or a
     slope away from 1 means the bands are *not* enclosing matched fractions, which is
     exactly the bias a single shared radius would introduce.
     """
@@ -422,7 +422,7 @@ def instrumental_colour(sources, ax=None):
     band_col = np.asarray(sources["band"])
     need = {"b_jkc_mag", "r_jkc_mag"}
     if not need <= set(sources.colnames):
-        ax.text(0.5, 0.5, "no catalogue colour available", ha="center", va="center",
+        ax.text(0.5, 0.5, "no catalog color available", ha="center", va="center",
                 transform=ax.transAxes, color=_style.INK_SECONDARY)
         ax.set_axis_off()
         return ax
@@ -443,9 +443,9 @@ def instrumental_colour(sources, ax=None):
         ax.plot(x, slope * x + intercept, color=_style.MODEL, lw=1.4,
                 label=f"slope {slope:.3f}")
         ax.legend(loc="lower right")
-    ax.set_xlabel("catalogue B-R (mag)")
+    ax.set_xlabel("catalog B-R (mag)")
     ax.set_ylabel("instrumental B-R (mag)")
-    ax.set_title("Colour fidelity of the per-band aperture")
+    ax.set_title("Color fidelity of the per-band aperture")
     return ax
 
 
@@ -798,7 +798,7 @@ def comparison_grid(curves, comps=None, ncols=4, max_panels=16):
             ax.set_axis_off()
             continue
         scatter = _scatter_of(lc)
-        # Flag the worst offenders with a reserved status colour *and* the word CHECK,
+        # Flag the worst offenders with a reserved status color *and* the word CHECK,
         # so the state is never carried by hue alone.
         bad = scatter > 0.05
         ax.plot(np.asarray(lc["time"], dtype=float) - epoch,
@@ -875,7 +875,7 @@ def scatter_vs_magnitude(curves, comps, ax=None):
     if np.isfinite(floor):
         _style.reference_line(ax, floor, axis="y", label=f"floor {floor:.0f} mmag")
     ax.set_yscale("log")
-    ax.set_xlabel("catalogue V (mag)")
+    ax.set_xlabel("catalog V (mag)")
     ax.set_ylabel("achieved scatter (mmag)")
     ax.set_title("Precision vs comparison brightness")
     _style.legend(ax)

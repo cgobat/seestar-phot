@@ -1,7 +1,7 @@
 """Bayer demosaic for raw Seestar sub-exposures.
 
-A Seestar *stack* arrives already debayered as three colour planes. A raw sub does not:
-it is a single 2-D frame carrying the sensor's colour-filter mosaic, tagged by the
+A Seestar *stack* arrives already debayered as three color planes. A raw sub does not:
+it is a single 2-D frame carrying the sensor's color-filter mosaic, tagged by the
 ``BAYERPAT`` header keyword (``GRBG`` on the S50 and S30pro).
 
 :func:`debayer` turns that into the ``(3, ny, nx)`` R, G, B cube the rest of the package
@@ -21,7 +21,7 @@ they measured 4 ADU apart with matching sigma, while ``(0,1)`` read 986 and ``(1
 
 import numpy as np
 
-#: Offsets of each colour within the 2x2 mosaic quad, as the array is indexed.
+#: Offsets of each color within the 2x2 mosaic quad, as the array is indexed.
 #: ``{pattern: {band: ((row, col), ...)}}``.
 BAYER_PATTERNS = {
     "GRBG": {"G": ((0, 0), (1, 1)), "R": ((0, 1),), "B": ((1, 0),)},
@@ -51,7 +51,7 @@ def is_bayer(header, data):
 
     True for 2-D data carrying a ``BAYERPAT``. The keyword matters: a 2-D FITS image
     could be anything, and silently demosaicing a mono frame would quietly triple a
-    single channel into a grey "colour" image rather than failing.
+    single channel into a grey "color" image rather than failing.
     """
     return (data is not None and getattr(data, "ndim", 0) == 2
             and bool(str(header.get("BAYERPAT", "") or "").strip()))
@@ -60,7 +60,7 @@ def is_bayer(header, data):
 def debayer(raw, pattern=DEFAULT_PATTERN):
     """Bilinear demosaic of a 2-D Bayer frame into a ``(3, ny, nx)`` float32 cube.
 
-    Each colour's samples are scattered onto a full-size grid and convolved, then divided
+    Each color's samples are scattered onto a full-size grid and convolved, then divided
     by the same convolution of the sample *mask*. Normalising by the mask -- rather than
     using fixed 1/4 and 1/2 weights -- makes the frame edges come out right for free,
     which matters because sources near the edge are still measured.
@@ -108,7 +108,7 @@ def green_half(raw, pattern=DEFAULT_PATTERN):
 
 
 def channel_medians(raw, pattern=DEFAULT_PATTERN):
-    """Median of each colour's *native* samples, with no interpolation.
+    """Median of each color's *native* samples, with no interpolation.
 
     A quick way to see the sensor's channel balance. A raw Seestar sub reads roughly
     R/G/B = 986/965/1103 ADU, while an on-board stack reads ~963/965/964 -- the on-board

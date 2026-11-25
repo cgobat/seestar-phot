@@ -26,10 +26,10 @@ class Target:
     name : str
         Human label, used in figure titles and filenames.
     ra, dec : float
-        ICRS position in degrees. Used for the catalogue query centre, the
+        ICRS position in degrees. Used for the catalog query centre, the
         barycentric time correction, and to identify the target in the stars table.
     source_id : int, optional
-        Catalogue identifier, when known. Strongly preferred over letting the
+        Catalog identifier, when known. Strongly preferred over letting the
         pipeline guess "the source nearest the pointing" -- that heuristic is right
         for a field centred on an isolated target and wrong in a crowded one.
     """
@@ -63,14 +63,14 @@ class Project:
     source : FrameSource
         Where the frames come from -- e.g. :class:`frames.LocalTree`.
     work_dir : path-like
-        Everything derived lands here: the catalogue cache, ``frames.ecsv``,
+        Everything derived lands here: the catalog cache, ``frames.ecsv``,
         ``stars.ecsv``, ``measurements.ecsv``, the error log and ``diagnostics/``.
         Never the data tree, and never the FITS headers. (The per-frame ``.wcs``
         sidecar is the one exception -- it lives beside its frame, because it is
         expensive to recompute and useful to every project that touches that frame.)
     solver : str
         ``"astap"`` (default, local and offline), ``"local"`` (anchored on the reference
-        catalogue -- no binary, no network, no index files), ``"nova"``
+        catalog -- no binary, no network, no index files), ``"nova"``
         (astrometry.net), or ``"lift"`` for frames that already carry a trustworthy
         header solution.
     astap_exe : str, optional
@@ -93,19 +93,19 @@ class Project:
     thresh : float
         SEP detection threshold in units of the background RMS. Kept low so the
         SNR > 5 cut, not detection, defines the sample.
-    catalogue_half_deg : float
-        Half-size of the cached catalogue box. Must cover the full dithered area, not
+    catalog_half_deg : float
+        Half-size of the cached catalog box. Must cover the full dithered area, not
         just one FOV.
-    catalogue_tiles : int
-        Tiles per axis for the catalogue query. Leave at 1 unless the box is large;
+    catalog_tiles : int
+        Tiles per axis for the catalog query. Leave at 1 unless the box is large;
         Gaia TAP is unreliable under concurrency.
     gmag_limit : float
-        Faint limit of the catalogue query. Fainter costs query time and memory
+        Faint limit of the catalog query. Fainter costs query time and memory
         without adding usable calibrators.
     match_tol_arcsec : float
         Cross-match radius.
-    catalogue_backend : str
-        Where the reference catalogue comes from. ``"tap"`` (default) queries Gaia
+    catalog_backend : str
+        Where the reference catalog comes from. ``"tap"`` (default) queries Gaia
         directly and caches the field. ``"auto"`` explicitly opts into the offline
         copy when :mod:`gaiadb` has this field on disk and falls back to a Gaia TAP
         query when it does not, so installing the download is the only step needed to
@@ -113,9 +113,9 @@ class Project:
         ``"local"`` raises rather than querying, which is what you want on a machine
         that must not reach the internet.
     epoch : float
-        Decimal year to propagate catalogue positions to, e.g. ``2026.4``. Gaia
+        Decimal year to propagate catalog positions to, e.g. ``2026.4``. Gaia
         positions are J2016.0, and a decade of proper motion moves the fastest stars by
-        more than ``match_tol_arcsec``. Both TAP and offline catalogues can use
+        more than ``match_tol_arcsec``. Both TAP and offline catalogs can use
         SkyCoord space-motion propagation. Missing proper motions leave a source
         at its original coordinates. ``None`` leaves positions at the Gaia epoch.
     provenance : callable, optional
@@ -141,7 +141,7 @@ class Project:
         Map camera channels to :class:`calibration.CalibrationSpec` objects.
         Default ``{"G": CalibrationSpec()}`` preserves G-to-V. Add R-to-Rc or
         R-to-r with explicit reference columns, or configure another subset.
-        Catalogue columns must exist in the cached field catalogue; this does
+        Catalog columns must exist in the cached field catalog; this does
         not download or synthesize missing standard-band photometry. Rebuild
         cached frame tables with ``force=True`` after changing calibrations.
     depth_kwargs : dict, optional
@@ -164,11 +164,11 @@ class Project:
     enclosed_lightcurve: float = 0.95
     fit_mag_range: tuple = FIT_MAG_RANGE
     thresh: float = 2.0
-    catalogue_half_deg: float = 1.5
-    catalogue_tiles: int = 1
+    catalog_half_deg: float = 1.5
+    catalog_tiles: int = 1
     gmag_limit: float = 17.0
     match_tol_arcsec: float = 2.0
-    catalogue_backend: str = "auto"
+    catalog_backend: str = "auto"
     epoch: float = None
     provenance: object = field(default=None, repr=False)
     mask: object = field(default=None, repr=False)
@@ -187,9 +187,9 @@ class Project:
     # --- derived paths ---------------------------------------------------------------
 
     @property
-    def catalogue_path(self):
-        """ECSV cache of the reference catalogue for this field."""
-        return self.work_dir / f"catalogue_{_slug(self.target.name)}.ecsv"
+    def catalog_path(self):
+        """ECSV cache of the reference catalog for this field."""
+        return self.work_dir / f"catalog_{_slug(self.target.name)}.ecsv"
 
     @property
     def frames_path(self):
@@ -198,7 +198,7 @@ class Project:
 
     @property
     def stars_path(self):
-        """One row per measured catalogue source."""
+        """One row per measured catalog source."""
         return self.work_dir / "stars.ecsv"
 
     @property
@@ -228,73 +228,73 @@ class Project:
         return list(self.source.keys())
 
     @property
-    def catalogue_radius_deg(self):
-        """Cone radius covering the whole catalogue box, corners included.
+    def catalog_radius_deg(self):
+        """Cone radius covering the whole catalog box, corners included.
 
         The same figure :func:`catalogs.fetch_gaia_mosaic` computes for a single tile,
         so the two backends cover the same sky and can be compared row for row.
         """
-        return self.catalogue_half_deg * 2 ** 0.5 + 0.1
+        return self.catalog_half_deg * 2 ** 0.5 + 0.1
 
-    def catalogue_backend_used(self):
-        """Which backend :meth:`catalogue` would use. Touches no network."""
-        if self.catalogue_backend not in ("auto", "tap", "local"):
-            raise ValueError("catalogue_backend must be tap, local or auto")
-        if self.catalogue_backend != "auto":
-            return self.catalogue_backend
+    def catalog_backend_used(self):
+        """Which backend :meth:`catalog` would use. Touches no network."""
+        if self.catalog_backend not in ("auto", "tap", "local"):
+            raise ValueError("catalog_backend must be tap, local or auto")
+        if self.catalog_backend != "auto":
+            return self.catalog_backend
         from . import gaiadb
 
         requested = set()
         for spec in self.band_calibrations.values():
             if spec.reference_mag is not None:
                 requested.add(spec.reference_mag)
-            columns = spec.colour_columns
+            columns = spec.color_columns
             if columns:
                 requested.update((columns,) if isinstance(columns, str) else columns)
         if requested.difference(gaiadb.COLUMNS):
             return "tap"
         return "local" if gaiadb.covers(
-            self.target.radec, self.catalogue_radius_deg) else "tap"
+            self.target.radec, self.catalog_radius_deg) else "tap"
 
-    def catalogue(self, overwrite=False):
-        """Load (or build once) the cached reference catalogue for this field.
+    def catalog(self, overwrite=False):
+        """Load (or build once) the cached reference catalog for this field.
 
-        Either backend writes the same ECSV to :attr:`catalogue_path`, so everything
+        Either backend writes the same ECSV to :attr:`catalog_path`, so everything
         downstream is unaffected by which one ran.
         """
         from . import catalogs
 
         self.ensure_dirs()
-        if self.catalogue_path.exists() and not overwrite:
-            catalogue = catalogs.load_catalogue(self.catalogue_path)
-            catalogs.validate_catalogue(catalogue, self.band_calibrations)
-            if self.epoch is not None and catalogue.meta.get("epoch") != self.epoch:
-                catalogue = catalogs.propagate_epoch(catalogue, self.epoch,
-                            ref_epoch=catalogue.meta.get("epoch", 2016.0))
-                catalogue.write(self.catalogue_path, format="ascii.ecsv", overwrite=True)
-            return catalogue
+        if self.catalog_path.exists() and not overwrite:
+            catalog = catalogs.load_catalog(self.catalog_path)
+            catalogs.validate_catalog(catalog, self.band_calibrations)
+            if self.epoch is not None and catalog.meta.get("epoch") != self.epoch:
+                catalog = catalogs.propagate_epoch(catalog, self.epoch,
+                            ref_epoch=catalog.meta.get("epoch", 2016.0))
+                catalog.write(self.catalog_path, format="ascii.ecsv", overwrite=True)
+            return catalog
 
-        if self.catalogue_backend_used() == "local":
+        if self.catalog_backend_used() == "local":
             from . import gaiadb
 
-            catalogue = gaiadb.cone(
-                self.target.radec, self.catalogue_radius_deg,
+            catalog = gaiadb.cone(
+                self.target.radec, self.catalog_radius_deg,
                 gmag_limit=self.gmag_limit, epoch=self.epoch,
             )
-            catalogs.validate_catalogue(catalogue, self.band_calibrations)
-            catalogue.write(self.catalogue_path, format="ascii.ecsv", overwrite=True)
-            return catalogue
+            catalogs.validate_catalog(catalog, self.band_calibrations)
+            catalog.write(self.catalog_path, format="ascii.ecsv", overwrite=True)
+            return catalog
 
-        catalogue = catalogs.fetch_gaia_catalogue(
-            self.target.radec, self.catalogue_path,
-            half_size_deg=self.catalogue_half_deg, n_tiles=self.catalogue_tiles,
+        catalog = catalogs.fetch_gaia_catalog(
+            self.target.radec, self.catalog_path,
+            half_size_deg=self.catalog_half_deg, n_tiles=self.catalog_tiles,
             gmag_limit=self.gmag_limit, overwrite=overwrite, epoch=self.epoch,
         )
-        catalogs.validate_catalogue(catalogue, self.band_calibrations)
-        return catalogue
+        catalogs.validate_catalog(catalog, self.band_calibrations)
+        return catalog
 
-    # Fetching now uses the configured catalogue backend, not a third-party download.
-    fetch_catalogue = catalogue
+    # Fetching now uses the configured catalog backend, not a third-party download.
+    fetch_catalog = catalog
 
     @property
     def api_key(self):

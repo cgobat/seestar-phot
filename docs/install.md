@@ -42,7 +42,7 @@ In CI, cache that directory keyed on the dataset version — see `.github/workfl
 |---|---|---|
 | `plot` | `matplotlib` | Any diagnostic figure — `plots`, `report` |
 | `stack` | `astroalign`, `scikit-image` | Stacking raw sub-exposures |
-| `catalog` | `pyarrow`, `astropy-healpix` | The offline Gaia catalogue and `solver="local"` |
+| `catalog` | `pyarrow`, `astropy-healpix` | The offline Gaia catalog and `solver="local"` |
 | `dev` | the above, plus `pytest` | Running the test suite |
 
 ```bash
@@ -54,7 +54,7 @@ by batch jobs on headless machines; it is imported lazily, so `import seestar_ph
 never needs it. In practice you almost certainly want it — the diagnostics are how you
 check a reduction.
 
-## The offline Gaia catalogue
+## The offline Gaia catalog
 
 Optional, and much larger than the example data. It removes the Gaia TAP query — the
 least reliable step in the pipeline — and it is what `solver="local"` pairs against.
@@ -64,7 +64,7 @@ pip install "seestar-photometry[catalog]"
 ```
 
 ```python
-proj.catalogue()     # default: direct Gaia TAP query cached as a field ECSV
+proj.catalog()     # default: direct Gaia TAP query cached as a field ECSV
 ```
 
 ```python
@@ -75,7 +75,7 @@ gaiadb.download()                                        # or the whole 6.4 GB
 ```
 
 For the optional all-sky dataset, download a cone at least as large as
-`Project.catalogue_radius_deg`, then set `catalogue_backend="local"`. Downloading only
+`Project.catalog_radius_deg`, then set `catalog_backend="local"`. Downloading only
 one frame's footprint can leave the dithered project field incomplete.
 
 The whole sky is published — 148,667,792 sources to V < 17.5 — but fetching per region is
@@ -90,7 +90,7 @@ It has its own cache location, so it can live on a different disk from the examp
 | `XDG_CACHE_HOME` / `LOCALAPPDATA` | the platform cache location |
 | otherwise | `~/.cache/seestar-photometry` |
 
-`Project` defaults to `catalogue_backend="tap"`, which queries the Gaia database
+`Project` defaults to `catalog_backend="tap"`, which queries the Gaia database
 independently of this optional dataset. Select `"local"` to require the dataset without
 network fallback, or `"auto"` to use it only where coverage and requested columns permit.
 SDSS reference columns require TAP or a supplied enriched ECSV.
@@ -105,18 +105,18 @@ Project(..., epoch=2026.4)      # propagate to the observing season
 
 And it carries synthetic magnitudes in the Seestar's *own* R/G/B bands — `r_s50_mag`,
 `g_s50_mag`, `b_s50_mag` and their errors — integrated from Gaia XP spectra through the
-unit's fitted passbands, for the 34.2M sources brighter than G = 15 (23% of the catalogue;
+unit's fitted passbands, for the 34.2M sources brighter than G = 15 (23% of the catalog;
 ESA publishes sampled XP spectra no fainter than that, and the columns are masked
 elsewhere). Nothing in the calibration path reads them yet — `v_jkc_mag` remains the
 reference — but they are what would let each Bayer plane be calibrated against its own
 band instead of the nearest classical one. See
 [the S50 photometric system](background-info/s50-photometric-system.md).
 
-To build a catalogue for one field yourself instead of downloading, from a source
+To build a catalog for one field yourself instead of downloading, from a source
 checkout:
 
 ```bash
-uv run python tools/build_gaia_catalogue.py --ra 186.6821 --dec 81.474 --radius 3
+uv run python tools/build_gaia_catalog.py --ra 186.6821 --dec 81.474 --radius 3
 ```
 
 ## A plate solver
@@ -126,8 +126,8 @@ The on-board Seestar WCS is not accurate enough for photometry (see
 options:
 
 **The local solver** — no binary, no network, no index files. It pairs detections against
-the reference catalogue the pipeline already needs, so the only requirement is having that
-catalogue: either the offline download above, or a cached TAP one from a previous run.
+the reference catalog the pipeline already needs, so the only requirement is having that
+catalog: either the offline download above, or a cached TAP one from a previous run.
 
 ```python
 Project(..., solver="local")
@@ -162,7 +162,7 @@ astap.executable()             # -> what solve_astap will run
 ```
 
 The star database is ASTAP's own quad index and is **not** the same thing as the Gaia
-reference catalogue above; you need both if you use this solver. `d05` is the default and
+reference catalog above; you need both if you use this solver. `d05` is the default and
 covers 0.6–10° fields, which spans both Seestar models. Pass `database="d20"` (400 MB) if a
 solve is marginal on the S50's narrow axis.
 

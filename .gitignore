@@ -23,6 +23,7 @@ htmlcov/
 frames.ecsv
 stars.ecsv
 measurements.ecsv
+catalog_*.ecsv
 catalogue_*.ecsv
 diagnostics/
 errors.log

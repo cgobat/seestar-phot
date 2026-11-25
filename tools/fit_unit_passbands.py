@@ -5,11 +5,11 @@ The sensor QE curves (``tools/digitise_sensor_qe.py``) are only half of a passba
 other half is the UV/IR-cut filter in front of it, and its red edge is not published for
 any of these units -- so it is **fitted from the photometry**, exactly as it was for the
 S50: calibrate each Bayer plane against a synthetic magnitude computed at a trial edge,
-measure the zero-point residual's slope against colour, and take the edge where that
+measure the zero-point residual's slope against color, and take the edge where that
 slope crosses zero. A passband that is too red makes the plane look too sensitive to red
 stars and the slope goes one way; too blue and it goes the other.
 
-The colour axis is Gaia ``BP-RP``, deliberately *not* a colour built from the bands being
+The color axis is Gaia ``BP-RP``, deliberately *not* a color built from the bands being
 fitted, which would be scored against itself.
 
 Two free parameters per unit, fitted in that order:
@@ -128,7 +128,7 @@ BLEND_DMAG = 2.5
 #:
 #: The ``s50`` row is the **control** and is not what the package ships: the published
 #: S50 passbands (``tools/bayer_passbands.ecsv``, edge 693.0, B tail 1.15, no G tail)
-#: are what the 34.2M synthetic magnitudes in the catalogue were built from, and
+#: are what the 34.2M synthetic magnitudes in the catalog were built from, and
 #: rebuilding them from a refit would silently invalidate those. It is here because
 #: reproducing it -- 692.8 nm against 693.0, and a G tail of 1.016 where the published
 #: model has none -- is what says the method still works.
@@ -187,8 +187,8 @@ def sensor_qe(sensor, wl):
 
 # --- stage 1: photometry ----------------------------------------------------------------
 
-def field_catalogue(gaiadb_dir, epoch=None):
-    """Gaia sources over the field, from the **offline** catalogue.
+def field_catalog(gaiadb_dir, epoch=None):
+    """Gaia sources over the field, from the **offline** catalog.
 
     Not a TAP cone. A 4.6 degree box at G < 15 is nine tiles and the endpoint was still
     chewing on it after ten minutes; the offline copy answers the same question from
@@ -200,8 +200,8 @@ def field_catalogue(gaiadb_dir, epoch=None):
 
     ``bp_rp``
         Synthesised instead, from the same XP spectra as everything else, through Gaia's
-        own BP and RP passbands. See :func:`add_synthetic_colour`, which checks it
-        against real Gaia colours before it is used.
+        own BP and RP passbands. See :func:`add_synthetic_color`, which checks it
+        against real Gaia colors before it is used.
     ``phot_variable_flag``
         Not recoverable offline, so the variable cut is simply not applied. It removes a
         handful of stars from a few hundred; the 3-sigma clip in the slope fit is what
@@ -213,30 +213,30 @@ def field_catalogue(gaiadb_dir, epoch=None):
                        gmag_limit=15.0, epoch=epoch)
 
 
-def add_synthetic_colour(catalogue, ids, flux, flux_err, quiet=False):
+def add_synthetic_color(catalog, ids, flux, flux_err, quiet=False):
     """Attach a ``bp_rp`` synthesised from the XP spectra, and check it against Gaia's.
 
-    The check is not optional decoration: a colour axis that is quietly wrong would tilt
+    The check is not optional decoration: a color axis that is quietly wrong would tilt
     every fitted edge in the same direction and still look perfectly smooth. The 20 Cep
     TAP result in ``photometry-adventures-2`` carries real Gaia ``bp_rp`` for this field,
-    so the synthetic colour is compared against it star by star and the agreement is
+    so the synthetic color is compared against it star by star and the agreement is
     reported.
     """
     from astropy.table import Table
 
     standard = Table.read(str(HERE / "standard_passbands.ecsv"))
-    colour = {}
+    color = {}
     for band in ("BP_GAIA", "RP_GAIA"):
         response = np.asarray(standard[band], float)
-        colour[band], _ = s50.synth_mags(flux, flux_err, s50.XP_GRID, response)
-    synthetic = colour["BP_GAIA"] - colour["RP_GAIA"]
+        color[band], _ = s50.synth_mags(flux, flux_err, s50.XP_GRID, response)
+    synthetic = color["BP_GAIA"] - color["RP_GAIA"]
 
-    star = np.asarray(catalogue["source_id"], np.int64)
+    star = np.asarray(catalog["source_id"], np.int64)
     where = np.clip(np.searchsorted(ids, star), 0, max(len(ids) - 1, 0))
     hit = len(ids) and (ids[where] == star)
-    out = np.full(len(catalogue), np.nan)
+    out = np.full(len(catalog), np.nan)
     out[hit] = synthetic[where[hit]]
-    catalogue["bp_rp"] = out
+    catalog["bp_rp"] = out
 
     truth = Path("D:/CrowdSky/crowdsky-workspace/Repos/photometry-adventures-2"
                  "/paper/data/gaia_20Cep.ecsv")
@@ -250,18 +250,18 @@ def add_synthetic_colour(catalogue, ids, flux, flux_err, quiet=False):
             print(f"  synthetic BP-RP vs Gaia's own, {int(good.sum())} stars: "
                   f"median {np.median(delta):+.4f}, scatter "
                   f"{np.std(delta - np.median(delta)):.4f} mag", flush=True)
-    return catalogue
+    return catalog
 
 
-def _blend_flag(inframe, catalogue, aperture_px, pixel_scale):
-    """True where a catalogue neighbour is close and bright enough to pollute the sum."""
+def _blend_flag(inframe, catalog, aperture_px, pixel_scale):
+    """True where a catalog neighbour is close and bright enough to pollute the sum."""
     import astropy.units as u
     from astropy.coordinates import SkyCoord
 
     radius = BLEND_APER * aperture_px * pixel_scale
     here = SkyCoord(inframe["ra"], inframe["dec"], unit="deg")
-    everything = SkyCoord(catalogue["ra"], catalogue["dec"], unit="deg")
-    g_all = np.asarray(catalogue["phot_g_mean_mag"], float)
+    everything = SkyCoord(catalog["ra"], catalog["dec"], unit="deg")
+    g_all = np.asarray(catalog["phot_g_mean_mag"], float)
     g_here = np.asarray(inframe["phot_g_mean_mag"], float)
     i_all, i_here, sep, _ = here.search_around_sky(everything, radius * u.arcsec)
     flag = np.zeros(len(inframe), bool)
@@ -271,7 +271,7 @@ def _blend_flag(inframe, catalogue, aperture_px, pixel_scale):
     return flag
 
 
-def measure_unit(unit, catalogue, limit=0, quiet=False):
+def measure_unit(unit, catalog, limit=0, quiet=False):
     """Per-star instrumental magnitudes for every stack of one unit."""
     from astropy.table import Table, vstack
     from seestar_photometry import astrometry, catalogs, frames, photometry
@@ -290,11 +290,11 @@ def measure_unit(unit, catalogue, limit=0, quiet=False):
             if wcs is None:
                 print(f"  {path.name}: no WCS", flush=True)
                 continue
-            inframe = catalogs.sources_in_frame(catalogue, wcs, frame)
+            inframe = catalogs.sources_in_frame(catalog, wcs, frame)
             # Only stars that could ever be calibrators are measured. The cut window is
             # V in [9.5, 13); everything fainter is 90% of the positions on a 4K frame
             # and none of the answer, and forced photometry is linear in positions.
-            # Blends are still flagged against the *whole* catalogue below -- a faint
+            # Blends are still flagged against the *whole* catalog below -- a faint
             # neighbour still pollutes an aperture even though it is never a calibrator.
             bright = np.ma.filled(np.asarray(inframe["v_jkc_mag"]), np.inf) \
                 < CAL_RANGE[1] + 0.5
@@ -306,7 +306,7 @@ def measure_unit(unit, catalogue, limit=0, quiet=False):
             phot = photometry.forced_photometry(
                 frame, inframe["ra"], inframe["dec"], wcs,
                 source_id=inframe["source_id"], enclosed=ENCLOSED)
-            blend = _blend_flag(inframe, catalogue, phot.meta["aperture"][1],
+            blend = _blend_flag(inframe, catalog, phot.meta["aperture"][1],
                                 astrometry.pixel_scale(frame))
             lut = {int(s): i for i, s in enumerate(inframe["source_id"])}
 
@@ -342,7 +342,7 @@ def measure_unit(unit, catalogue, limit=0, quiet=False):
 
 
 def calibrator_mask(table):
-    """Bright enough, unsaturated, unblended, steady, and with a colour to fit against."""
+    """Bright enough, unsaturated, unblended, steady, and with a color to fit against."""
     return (np.isfinite(np.asarray(table["m_inst"], float))
             & np.isfinite(np.asarray(table["bp_rp"], float))
             & (np.asarray(table["snr"], float) > SNR_MIN)
@@ -386,19 +386,19 @@ def slope_at(table, keep, reference):
     night and a single median over all frames would fold that drift into the residual
     and flatten the very slope being measured.
     """
-    colour = np.asarray(table["bp_rp"], float)[keep]
+    color = np.asarray(table["bp_rp"], float)[keep]
     m_inst = np.asarray(table["m_inst"], float)[keep]
     frame = np.asarray(table["frame"])[keep]
     resid = reference - m_inst
     for name in np.unique(frame):
         here = frame == name
         resid[here] -= np.median(resid[here])
-    good = np.isfinite(resid) & np.isfinite(colour)
+    good = np.isfinite(resid) & np.isfinite(color)
     if good.sum() < 50:
         return np.nan, np.nan, 0
     clip = np.abs(resid - np.median(resid[good])) < 3 * np.std(resid[good])
     good &= clip
-    coef, cov = np.polyfit(colour[good], resid[good], 1, cov=True)
+    coef, cov = np.polyfit(color[good], resid[good], 1, cov=True)
     return float(coef[0]), float(np.sqrt(cov[0, 0])), int(good.sum())
 
 
@@ -465,7 +465,7 @@ def scan_unit(unit, table, spectra, quiet=False):
     # few percent to digitise wrong; on both new sensors that is exactly where the model
     # broke. So the edge is measured where the data is strong and the residual is
     # attributed to the shoulders where it is weak, rather than averaged across both and
-    # left as an equal-and-opposite colour term in G and R.
+    # left as an equal-and-opposite color term in G and R.
     edge, edge_scan = crossing_over(EDGE_GRID, "R", lambda e: ("R", e))
     tails = {}
     for plane in ("G", "B"):
@@ -489,7 +489,7 @@ def scan_unit(unit, table, spectra, quiet=False):
         print(f"    tail scales: G x{tails['G']:.3f}, B x{tails['B']:.3f}", flush=True)
         for plane in ("R", "G", "B"):
             slope, err, n = residual[plane]
-            print(f"      {plane} residual colour term {slope:+.4f} +/- {err:.4f} "
+            print(f"      {plane} residual color term {slope:+.4f} +/- {err:.4f} "
                   f"mag/mag  (n={n})", flush=True)
 
     return {"unit": unit.name, "sensor": unit.sensor, "red_edge": edge,
@@ -501,9 +501,9 @@ def write_passbands(out=HERE / "unit_passbands.ecsv"):
     """Write the fitted total-system passbands for the units this package fits itself.
 
     The S50 is deliberately absent: its passbands are already published in
-    ``bayer_passbands.ecsv`` and the deployed catalogue's magnitudes were integrated
+    ``bayer_passbands.ecsv`` and the deployed catalog's magnitudes were integrated
     through that exact file. Two files claiming to be the S50's passbands, differing in
-    the third decimal, is how a catalogue quietly stops matching its own documentation.
+    the third decimal, is how a catalog quietly stops matching its own documentation.
     """
     from astropy.table import Table
 
@@ -526,12 +526,12 @@ def write_passbands(out=HERE / "unit_passbands.ecsv"):
         "Seestar total-system passbands (relative response), per unit model.",
         "Sensor QE from tools/sensor_qe.ecsv times a UV/IR-cut model whose red edge and",
         "per-channel red-shoulder scales are FITTED from each unit's own 20 Cep frames",
-        "by zeroing the zero-point colour term against Gaia BP-RP.",
+        "by zeroing the zero-point color term against Gaia BP-RP.",
         f"Blue edge {IRCUT_BLUE_EDGE:.0f} nm, 10-90% width {IRCUT_EDGE_WIDTH:.0f} nm, "
         f"peak {IRCUT_PEAK}.",
         *lines,
         "The S50 is NOT here: see tools/bayer_passbands.ecsv, which the deployed",
-        "catalogue's r/g/b_s50_mag columns were integrated through.",
+        "catalog's r/g/b_s50_mag columns were integrated through.",
         f"Built by tools/{Path(__file__).name}.",
     ]
     table.write(str(out), overwrite=True)
@@ -597,7 +597,7 @@ def main():
     ap.add_argument("--gaiadb", type=Path, default=Path("D:/tmp/gaia_s50"),
                     help="the offline Gaia dataset to read the field from")
     ap.add_argument("--epoch", type=float, default=2026.7,
-                    help="observing epoch to propagate catalogue positions to")
+                    help="observing epoch to propagate catalog positions to")
     ap.add_argument("--stage", choices=("measure", "scan", "write", "all"),
                     default="all")
     ap.add_argument("--limit", type=int, default=0, help="max stacks per dataset")
@@ -612,11 +612,11 @@ def main():
         return
 
     args.work.mkdir(parents=True, exist_ok=True)
-    catalogue = field_catalogue(args.gaiadb, epoch=args.epoch)
-    print(f"catalogue: {len(catalogue)} Gaia sources over {FIELD_RADIUS} deg "
+    catalog = field_catalog(args.gaiadb, epoch=args.epoch)
+    print(f"catalog: {len(catalog)} Gaia sources over {FIELD_RADIUS} deg "
           f"at {FIELD_CENTRE}, epoch {args.epoch}", flush=True)
-    spectra = load_spectra(args.work, np.asarray(catalogue["source_id"]))
-    catalogue = add_synthetic_colour(catalogue, *spectra)
+    spectra = load_spectra(args.work, np.asarray(catalog["source_id"]))
+    catalog = add_synthetic_color(catalog, *spectra)
 
     for unit in UNITS:
         cache = args.work / f"photometry_{unit.name}.ecsv"
@@ -626,7 +626,7 @@ def main():
             else:
                 print(f"{unit.name}: measuring", flush=True)
                 t0 = time.time()
-                measure_unit(unit, catalogue, limit=args.limit).write(
+                measure_unit(unit, catalog, limit=args.limit).write(
                     str(cache), overwrite=True)
                 print(f"  done in {(time.time()-t0)/60:.1f} min", flush=True)
 

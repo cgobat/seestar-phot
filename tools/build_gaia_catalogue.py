@@ -1,18 +1,18 @@
 #!/usr/bin/env python
-"""Build a local Gaia catalogue in the :mod:`gaiadb` layout.
+"""Build a local Gaia catalog in the :mod:`gaiadb` layout.
 
 Two scales, and only the first is implemented here:
 
 **A region**, queried straight from Gaia TAP::
 
-    uv run python tools/build_gaia_catalogue.py --ra 186.6821 --dec 81.474 --radius 3
+    uv run python tools/build_gaia_catalog.py --ra 186.6821 --dec 81.474 --radius 3
 
 This is what you want for trying the offline path on a field you already have data for,
 and for the real-data tests. A few degrees is a comfortable query; a few tens of degrees
 is not, because TAP will truncate it.
 
 **The whole sky** is a different job and is deliberately not attempted through TAP. At
-G < 17.65 the synthetic-photometry catalogue is ~220 million rows, which is a bulk
+G < 17.65 the synthetic-photometry catalog is ~220 million rows, which is a bulk
 download from the Gaia archive (the per-HEALPix ``gaia_source`` and
 ``synthetic_photometry_gspc`` files) joined offline, not an ADQL query. The writing half
 is already shared -- :func:`gaiadb.write_dataset` takes whatever table it is handed --
@@ -168,7 +168,7 @@ def main():
     print(f"[gaia] -> {out}")
     if args.out is None:
         print("[gaia] this is the directory gaiadb reads, so it is live now; "
-              "Project(catalogue_backend='auto') will pick it up")
+              "Project(catalog_backend='auto') will pick it up")
 
 
 def _existing_rows(directory, incoming):

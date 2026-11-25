@@ -47,7 +47,7 @@ def test_channel_last_cube_is_transposed(tmp_path, cube):
 
 
 def test_mef_footprint_is_not_a_science_plane(tmp_path, cube):
-    """FOOTPRINT is a 2-D image HDU; treating it as a plane would shift the colours."""
+    """FOOTPRINT is a 2-D image HDU; treating it as a plane would shift the colors."""
     frame = frames.load_frame(write_mef(tmp_path / "f.fits", cube, with_footprint=True))
     # The blue plane must be blue, not a plane of ones.
     assert frame.b.max() > 100.0

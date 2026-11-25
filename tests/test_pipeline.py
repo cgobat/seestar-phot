@@ -1,7 +1,7 @@
 """The three pipeline stages, end to end on synthetic frames, offline.
 
 Everything is local: frames are written to a temp tree, WCS sidecars are placed
-directly rather than solved, and the catalogue cache is pre-populated so no Gaia query
+directly rather than solved, and the catalog cache is pre-populated so no Gaia query
 is attempted. That makes this a real end-to-end test of the orchestration -- resume
 behaviour, table schemas, error tolerance -- without a network or a plate solver.
 """
@@ -13,7 +13,7 @@ from astropy.table import Table
 from seestar_photometry import LocalTree, Project, Target, pipeline
 
 from conftest import (
-    FIELD_DEC, FIELD_RA, expected_zeropoint, make_catalogue, make_cube,
+    FIELD_DEC, FIELD_RA, expected_zeropoint, make_catalog, make_cube,
     write_cube, write_mef, write_wcs_sidecar,
 )
 
@@ -21,7 +21,7 @@ N_SYNTH_FRAMES = 4
 
 
 @pytest.fixture
-def dataset(tmp_path, cube, catalogue):
+def dataset(tmp_path, cube, catalog):
     """A small synthetic project: 3 native frames + 1 CrowdSky frame, all solved."""
     data = tmp_path / "data"
     data.mkdir()
@@ -39,7 +39,7 @@ def dataset(tmp_path, cube, catalogue):
         work_dir=work,
     )
     proj.ensure_dirs()
-    catalogue.write(proj.catalogue_path, format="ascii.ecsv", overwrite=True)
+    catalog.write(proj.catalog_path, format="ascii.ecsv", overwrite=True)
     return proj
 
 
@@ -55,9 +55,9 @@ def test_project_finds_every_frame(dataset):
     assert len(dataset.frames()) == N_SYNTH_FRAMES
 
 
-def test_project_reads_the_cached_catalogue_without_querying(dataset):
+def test_project_reads_the_cached_catalog_without_querying(dataset):
     """A pre-populated cache must be read, never re-queried -- the tests are offline."""
-    assert len(dataset.catalogue()) > 20
+    assert len(dataset.catalog()) > 20
 
 
 # --- stage 2: the frame table ----------------------------------------------------------
@@ -116,7 +116,7 @@ def test_corrupt_frame_is_recorded_not_fatal(dataset):
     assert "load_error" in dataset.log_path.read_text(encoding="utf-8")
 
 
-def test_provenance_columns_are_merged(tmp_path, cube, catalogue):
+def test_provenance_columns_are_merged(tmp_path, cube, catalog):
     data = tmp_path / "d"
     data.mkdir()
     write_wcs_sidecar(write_cube(data / "p.fit", cube))
@@ -127,7 +127,7 @@ def test_provenance_columns_are_merged(tmp_path, cube, catalogue):
         provenance=_provenance,
     )
     proj.ensure_dirs()
-    catalogue.write(proj.catalogue_path, format="ascii.ecsv", overwrite=True)
+    catalog.write(proj.catalog_path, format="ascii.ecsv", overwrite=True)
     frames = pipeline.build_frame_table(proj, workers=1)
     assert frames["dataset"][0] == "synthetic"
 
@@ -139,13 +139,13 @@ def _provenance(frame):
 
 # --- stage 3: the measurement tables ---------------------------------------------------
 
-def test_build_measurements(dataset, catalogue):
+def test_build_measurements(dataset, catalog):
     stars, meas = pipeline.build_measurements(dataset, workers=1)
     assert dataset.stars_path.exists() and dataset.measurements_path.exists()
-    # Every catalogue source, in every band, in every frame.
-    assert len(meas) == pytest.approx(len(catalogue) * 3 * N_SYNTH_FRAMES, rel=0.05)
+    # Every catalog source, in every band, in every frame.
+    assert len(meas) == pytest.approx(len(catalog) * 3 * N_SYNTH_FRAMES, rel=0.05)
     assert set(np.asarray(meas["band"]).tolist()) == {"R", "G", "B"}
-    assert len(stars) == len(catalogue)
+    assert len(stars) == len(catalog)
 
 
 def test_measurements_use_the_lightcurve_aperture(dataset):
@@ -188,7 +188,7 @@ def test_full_chain_produces_a_lightcurve(dataset):
     pipeline.build_frame_table(dataset, workers=1)
     stars, meas = pipeline.build_measurements(dataset, workers=1)
     comps = lightcurves.select_comparisons(
-        stars, dmag=None, colour_tol=None, exclude_variable=False
+        stars, dmag=None, color_tol=None, exclude_variable=False
     )
     lc = lightcurves.differential_lightcurve(
         meas, lightcurves.target_id_of(stars), comps
@@ -211,11 +211,11 @@ def test_load_tables_returns_none_before_building(dataset):
     assert frames is None and stars is None and meas is None
 
 
-def test_pipeline_calibrates_red_and_preserves_default_green(dataset, catalogue):
+def test_pipeline_calibrates_red_and_preserves_default_green(dataset, catalog):
     from seestar_photometry import CalibrationSpec
 
     dataset.band_calibrations["R"] = CalibrationSpec(
-        reference_mag="r_jkc_mag", colour_columns=("b_jkc_mag", "r_jkc_mag"),
+        reference_mag="r_jkc_mag", color_columns=("b_jkc_mag", "r_jkc_mag"),
         reference_system="Cousins R (Vega)",
     )
     table = pipeline.build_frame_table(dataset, workers=1, limit=1)
@@ -225,7 +225,7 @@ def test_pipeline_calibrates_red_and_preserves_default_green(dataset, catalogue)
     red = measurements[np.asarray(measurements["band"]) == "R"]
     assert np.all(np.isfinite(red["mag"]))
     assert set(red["reference_system"]) == {"Cousins R (Vega)"}
-    reference = dict(zip(catalogue["source_id"], catalogue["r_jkc_mag"]))
+    reference = dict(zip(catalog["source_id"], catalog["r_jkc_mag"]))
     residual = red["mag"] - np.array([reference[sid] for sid in red["source_id"]])
     assert np.std(residual) < 0.03
     blue = measurements[np.asarray(measurements["band"]) == "B"]
@@ -233,15 +233,15 @@ def test_pipeline_calibrates_red_and_preserves_default_green(dataset, catalogue)
     assert np.all(np.isnan(blue["zeropoint"]))
 
 
-def test_custom_r_catalogue_survives_both_pipeline_stages(dataset, catalogue):
+def test_custom_r_catalog_survives_both_pipeline_stages(dataset, catalog):
     from seestar_photometry import CalibrationSpec, lightcurves
 
-    catalogue = catalogue.copy()
-    catalogue["r_ref"] = catalogue["r_jkc_mag"]
-    catalogue["g_ref"] = catalogue["b_jkc_mag"]
-    catalogue.write(dataset.catalogue_path, format="ascii.ecsv", overwrite=True)
+    catalog = catalog.copy()
+    catalog["r_ref"] = catalog["r_jkc_mag"]
+    catalog["g_ref"] = catalog["b_jkc_mag"]
+    catalog.write(dataset.catalog_path, format="ascii.ecsv", overwrite=True)
     dataset.band_calibrations = {"R": CalibrationSpec(
-        reference_mag="r_ref", colour_columns=("g_ref", "r_ref"),
+        reference_mag="r_ref", color_columns=("g_ref", "r_ref"),
         reference_system="test r (AB)",
     )}
     table = pipeline.build_frame_table(dataset, workers=1, limit=1)
@@ -251,7 +251,7 @@ def test_custom_r_catalogue_survives_both_pipeline_stages(dataset, catalogue):
     stars, measurements = pipeline.build_measurements(dataset, workers=1, limit=2)
     assert "r_ref" in stars.colnames
     comps = lightcurves.select_comparisons(
-        stars, dmag=None, colour_tol=None, mag_col="r_ref", exclude_variable=False
+        stars, dmag=None, color_tol=None, mag_col="r_ref", exclude_variable=False
     )
     lc = lightcurves.differential_lightcurve(
         measurements, lightcurves.target_id_of(stars), comps, band="R",

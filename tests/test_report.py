@@ -44,9 +44,9 @@ def test_frame_report_writes_the_full_set(tmp_path, cube_frame, extraction,
     paths = report.frame_report(cube_frame, extraction, calibration_fit, tmp_path)
     _nonempty(paths)
     stems = {p.stem for p in paths}
-    for expected in ("cog", "fwhm", "zp_relation", "zp_colour", "residual_map",
+    for expected in ("cog", "fwhm", "zp_relation", "zp_color", "residual_map",
                      "mag_snr", "match_sep", "detections", "background",
-                     "colour_fidelity", "residual_v", "residual_snr"):
+                     "color_fidelity", "residual_v", "residual_snr"):
         assert any(s.endswith(expected) for s in stems), f"missing the {expected} panel"
     _no_error_panels(paths)
 
@@ -135,7 +135,7 @@ def test_panels_accept_an_external_axes(cube_frame, extraction, calibration_fit)
 
     fig, axes = plt.subplots(1, 3, figsize=(12, 3))
     plots.curve_of_growth(extraction.cogs, extraction.aperture, ax=axes[0])
-    plots.zeropoint_vs_colour(calibration_fit, ax=axes[1])
+    plots.zeropoint_vs_color(calibration_fit, ax=axes[1])
     plots.mag_snr(extraction.sources, ax=axes[2])
     for ax in axes:
         assert ax.has_data() or ax.get_title()

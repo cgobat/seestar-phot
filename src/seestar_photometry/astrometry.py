@@ -1,7 +1,7 @@
 """Per-frame WCS, cached as a ``.wcs`` sidecar next to the FITS file.
 
 The on-board Seestar WCS is **not** photometric-grade: positions are off by tens of
-pixels (~1 arcmin), which drops the catalogue match rate to a few percent and makes
+pixels (~1 arcmin), which drops the catalog match rate to a few percent and makes
 forced photometry meaningless. Every frame is therefore re-solved, and the result is
 cached as a header-only FITS sidecar so the (expensive) solve happens exactly once
 per frame and is shared between projects.
@@ -9,17 +9,17 @@ per frame and is shared between projects.
 Several solvers, same sidecar, chosen with ``solver=``:
 
 ``"local"``
-    Anchored on a reference catalogue rather than on an index of quads. **Not a blind
+    Anchored on a reference catalog rather than on an index of quads. **Not a blind
     solver, and it does not need to be**: the on-board WCS is wrong by ~1 arcmin, not
     by degrees, so the pointing is a perfectly good seed and what is left is a
     refinement. Needs no external binary, no network and no index files -- only the
-    catalogue the pipeline already has -- so it is the one solver that works
+    catalog the pipeline already has -- so it is the one solver that works
     everywhere. See :func:`solve_local`.
 
 ``"astap"`` (default)
     A local, fully offline blind plate solver. Does its own star detection, handles
     the field rotation of Alt-Az frames, and takes ~a second per frame. Still the
-    default because it needs no catalogue at all.
+    default because it needs no catalog at all.
 
 ``"nova"``
     astrometry.net's web service, fed our own SEP source list (not the image) with
@@ -165,7 +165,7 @@ def astap_executable(astap_exe=None):
             "no ASTAP solver found. Install one (apt install astap-cli, or "
             "https://www.hnsky.org/astap.htm), or let this package fetch it:\n"
             "    from seestar_photometry import astap; astap.download()\n"
-            "Alternatively use solver='local', which needs only the reference catalogue."
+            "Alternatively use solver='local', which needs only the reference catalog."
         )
     return found
 
@@ -268,12 +268,12 @@ def solve_nova(frame, x, y, api_key=None, force=False, scale_err=10.0, timeout=3
     return _write_wcs(wcs_header, cache)
 
 
-# --- the catalogue-anchored solver ------------------------------------------------------
+# --- the catalog-anchored solver ------------------------------------------------------
 
-#: Detections and catalogue sources fed to the bootstrap, brightest first. The catalogue
+#: Detections and catalog sources fed to the bootstrap, brightest first. The catalog
 #: gets more because it covers more sky than the frame does -- see :func:`_bootstrap`.
 N_BOOTSTRAP_DETECTIONS = 250
-N_BOOTSTRAP_CATALOGUE = 500
+N_BOOTSTRAP_CATALOG = 500
 
 #: Fraction of the frame's half-diagonal within which detections are used for the
 #: rotation vote. The nominal plate scale is ~1% out, which displaces a star by ``1% * r``
@@ -296,11 +296,11 @@ SCALE_FACTORS = 1.0 + np.concatenate([[0.0], np.repeat(np.arange(1, 21), 2)
 #: skipping it halves the usual cost.
 VOTES_DECISIVE = 40
 
-#: Catalogue sources used in the plate-scale scan, brightest first.
+#: Catalog sources used in the plate-scale scan, brightest first.
 N_SCALE_SCAN = 2000
 
 #: Most detections carried into the solve, brightest first. A deep wide-field co-add
-#: yields tens of thousands, and the faint tail is below the reference catalogue's limit
+#: yields tens of thousands, and the faint tail is below the reference catalog's limit
 #: -- it cannot pair with anything, and only slows the fit down.
 N_DETECT_MAX = 4000
 
@@ -309,7 +309,7 @@ N_DETECT_MAX = 4000
 #: :func:`detect_for_solve`.
 SOLVE_THRESH = 5.0
 
-#: Fraction of detections that must pair with a catalogue source for a solve to be
+#: Fraction of detections that must pair with a catalog source for a solve to be
 #: believed. See the check at the end of :func:`_refine` for the measurements behind it.
 MIN_PAIR_FRACTION = 0.08
 
@@ -403,7 +403,7 @@ def _pair_up(x, y, cx, cy, tol_px):
     """Nearest-neighbour pairing between detections and predicted positions.
 
     Returns ``(det_index, cat_index)`` for pairs within ``tol_px``. Where several
-    catalogue sources fall on one detection -- routine in a crowded field at 2.4
+    catalog sources fall on one detection -- routine in a crowded field at 2.4
     arcsec/px -- only the closest is kept, so a blend contributes one pair rather than
     dragging the fit towards the midpoint of a pile-up.
     """
@@ -487,7 +487,7 @@ def _refine(wcs, x, y, ra, dec, scale, tol_arcsec, min_match, sip_degree,
     det, _cat = _pair_up(x, y, cx, cy, tol_arcsec / scale)
 
     # An absolute floor is not enough on a rich field: a few thousand detections against
-    # a few thousand catalogue sources throw up a handful of coincidences within the
+    # a few thousand catalog sources throw up a handful of coincidences within the
     # tolerance whatever the WCS says, so `min_match` alone accepts nonsense. A *wrong*
     # solve pairs almost nothing proportionally -- measured at 2% on an S30pro sub that
     # came out 65 arcsec off, against 18-55% for every correct solve across both models,
@@ -507,7 +507,7 @@ def detect_for_solve(frame, thresh=SOLVE_THRESH):
     low on purpose, so that the SNR cut and not the detection defines the sample; a
     solver wants the opposite. Detecting at 5 sigma instead of 2 took the same S30pro
     frame from 49 s to 8 s, and the sources it drops are the faint ones that the
-    reference catalogue does not reach anyway -- they cannot pair with anything, and
+    reference catalog does not reach anyway -- they cannot pair with anything, and
     only offer the matcher more ways to go wrong.
     """
     from . import photometry
@@ -576,7 +576,7 @@ def _best_scale(x, y, seed_xy, centre, shift, tol_px):
     from scipy.spatial import cKDTree
 
     tree = cKDTree(np.column_stack([x, y]))
-    # Bounded: a wide field can put tens of thousands of catalogue sources in range, and
+    # Bounded: a wide field can put tens of thousands of catalog sources in range, and
     # the scan queries the tree once per source per factor. The brightest few thousand
     # settle a single scalar perfectly well.
     offset = (seed_xy - centre)[:N_SCALE_SCAN]
@@ -591,14 +591,14 @@ def _best_scale(x, y, seed_xy, centre, shift, tol_px):
     return best[1], best[0]
 
 
-def _vote_threshold(n_detections, n_catalogue, half_px, bin_px=VOTE_BIN_PX):
+def _vote_threshold(n_detections, n_catalog, half_px, bin_px=VOTE_BIN_PX):
     """Votes the winning bin must draw to be more than a coincidence.
 
     The background is flat, so each bin holds ``n_pairs / n_bins`` on average and varies
     like its square root. See :data:`VOTE_SIGMA`.
     """
     n_bins = max(int(2 * half_px / bin_px), 1) ** 2
-    expected = n_detections * n_catalogue / n_bins
+    expected = n_detections * n_catalog / n_bins
     return max(MIN_VOTES_FLOOR, expected + VOTE_SIGMA * np.sqrt(expected))
 
 
@@ -608,16 +608,16 @@ def _bootstrap(frame, x, y, ra, dec, scale, min_match=8):
     The frame's orientation is unknown -- Alt-Az field rotation reaches tens of degrees
     -- and the pointing is off by up to :data:`POINTING_SLACK_ARCMIN`. What *is* known is
     the plate scale, to about 1%. So the unknown is a rotation and a shift, and both are
-    found by brute force: for each angle on a grid, rotate the catalogue's predicted
+    found by brute force: for each angle on a grid, rotate the catalog's predicted
     pixel positions and histogram every detection-minus-prediction offset. The angle
     whose histogram has the sharpest peak is the orientation, and the peak is the shift.
 
     An asterism matcher (astroalign, as :mod:`stacking` uses between raw subs) was the
     obvious choice here and does not work, which is worth recording. Triangle invariants
     discard the known scale, so the matcher has to rediscover it, and it can only match
-    the brightest N of each list. The catalogue has to cover the frame's diagonal *plus*
+    the brightest N of each list. The catalog has to cover the frame's diagonal *plus*
     the pointing error, which for an S50 sub is 6.2 square degrees against a 0.92 square
-    degree frame -- so only ~15% of the brightest catalogue sources are in the frame at
+    degree frame -- so only ~15% of the brightest catalog sources are in the frame at
     all, the two brightness rankings disagree, and matching fails on real frames however
     it is tuned. Voting has no such problem: contamination adds a flat background to the
     histogram rather than competing with the signal.
@@ -628,7 +628,7 @@ def _bootstrap(frame, x, y, ra, dec, scale, min_match=8):
     centre = np.array([nx / 2.0, ny / 2.0])
     half_diagonal = 0.5 * np.hypot(ny, nx)
     # The pointing error plus the frame's own half-diagonal: the furthest a detection can
-    # be from where the seed puts its catalogue counterpart.
+    # be from where the seed puts its catalog counterpart.
     half_px = (POINTING_SLACK_ARCMIN * 60.0 / scale) + half_diagonal
 
     core = np.hypot(x - centre[0], y - centre[1]) <= VOTE_CORE_FRACTION * half_diagonal
@@ -638,15 +638,15 @@ def _bootstrap(frame, x, y, ra, dec, scale, min_match=8):
             f"only {len(detections)} detections near the centre of {frame.path}; "
             "too few to anchor a local solve"
         )
-    n_catalogue = min(len(ra), N_BOOTSTRAP_CATALOGUE)
-    needed = _vote_threshold(len(detections), n_catalogue, half_px)
+    n_catalog = min(len(ra), N_BOOTSTRAP_CATALOG)
+    needed = _vote_threshold(len(detections), n_catalog, half_px)
 
     best = (0.0, None, None, None)
     for parity in SEED_PARITY:
         seed_xy = np.column_stack(
             _seed_wcs(frame, parity).world_to_pixel_values(ra, dec)
         )
-        predicted = seed_xy[:N_BOOTSTRAP_CATALOGUE]
+        predicted = seed_xy[:N_BOOTSTRAP_CATALOG]
         for degrees in np.arange(0.0, 360.0, ROTATION_STEP_DEG):
             votes, dx, dy = _vote(detections, _rotate(predicted, centre, degrees),
                                   half_px)
@@ -658,11 +658,11 @@ def _bootstrap(frame, x, y, ra, dec, scale, min_match=8):
     votes, parity, degrees, shift = best
     if votes < needed:
         raise RuntimeError(
-            f"could not match {frame.path} against the catalogue: the best offset drew "
+            f"could not match {frame.path} against the catalog: the best offset drew "
             f"{votes:.0f} votes, below the {needed:.0f} needed to stand clear of the "
-            f"background ({len(detections)} core detections, {n_catalogue} of "
-            f"{len(ra)} catalogue sources used). The pointing may be wrong by more "
-            f"than {POINTING_SLACK_ARCMIN:.0f} arcmin, or the catalogue may not cover it."
+            f"background ({len(detections)} core detections, {n_catalog} of "
+            f"{len(ra)} catalog sources used). The pointing may be wrong by more "
+            f"than {POINTING_SLACK_ARCMIN:.0f} arcmin, or the catalog may not cover it."
         )
 
     # Orientation is settled; now recover the scale over the full frame, then turn the
@@ -678,18 +678,18 @@ def _bootstrap(frame, x, y, ra, dec, scale, min_match=8):
     det, cat = _pair_up(x, y, placed[:, 0], placed[:, 1], VOTE_BIN_PX / 2.0)
     if len(det) < min_match:
         raise RuntimeError(
-            f"could not match {frame.path} against the catalogue: the winning offset "
+            f"could not match {frame.path} against the catalog: the winning offset "
             f"drew {votes:.0f} votes but only {len(det)} sources paired up "
             f"(scale factor {factor:.4f}, {paired} at best)"
         )
     return _fit(x[det], y[det], ra[cat], dec[cat])
 
 
-def solve_local(frame, catalogue, x=None, y=None, force=False, thresh=SOLVE_THRESH,
+def solve_local(frame, catalog, x=None, y=None, force=False, thresh=SOLVE_THRESH,
                 tol_arcsec=3.0, min_match=8, sip_degree=None):
-    """Solve and cache a frame's WCS against a local reference catalogue.
+    """Solve and cache a frame's WCS against a local reference catalog.
 
-    No index files, no subprocess, no network: the catalogue the pipeline already needs
+    No index files, no subprocess, no network: the catalog the pipeline already needs
     for its photometry is also everything the astrometry needs. That makes this the only
     solver with no external dependency at all, and it is faster than ASTAP because it
     starts from the pointing instead of searching for it.
@@ -710,7 +710,7 @@ def solve_local(frame, catalogue, x=None, y=None, force=False, thresh=SOLVE_THRE
     Parameters
     ----------
     frame : SeestarFrame
-    catalogue : astropy.table.Table
+    catalog : astropy.table.Table
         Reference sources with ``ra``/``dec`` in degrees, covering the field. Ordering
         does not matter; it is sorted by brightness here.
     x, y : array-like, optional
@@ -736,7 +736,7 @@ def solve_local(frame, catalogue, x=None, y=None, force=False, thresh=SOLVE_THRE
         x, y = detect_for_solve(frame, thresh=thresh)
     x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
 
-    ra, dec, n_all = _field_sources(frame, catalogue)
+    ra, dec, n_all = _field_sources(frame, catalog)
     scale = pixel_scale(frame)
 
     wcs = None
@@ -754,16 +754,16 @@ def solve_local(frame, catalogue, x=None, y=None, force=False, thresh=SOLVE_THRE
         raise RuntimeError(
             f"local solve of {frame.path} did not converge: fewer than {min_match} "
             f"sources paired within {tol_arcsec} arcsec ({len(x)} detections, "
-            f"{len(ra)} of {n_all} catalogue sources near the field)"
+            f"{len(ra)} of {n_all} catalog sources near the field)"
         )
     return _write_wcs(wcs.to_header(relax=True), cache)
 
 
-def _field_sources(frame, catalogue):
-    """Catalogue sources plausibly on this frame, brightest first.
+def _field_sources(frame, catalog):
+    """Catalog sources plausibly on this frame, brightest first.
 
     Trimmed to a generous circle around the header pointing -- a project's cached
-    catalogue covers the whole dithered area, which is far more sky than one frame sees,
+    catalog covers the whole dithered area, which is far more sky than one frame sees,
     and every extra source is another false-pair candidate for the matcher. Returns
     ``(ra, dec, n_before)``.
     """
@@ -773,9 +773,9 @@ def _field_sources(frame, catalogue):
     # seed's unknown rotation swinging the corners around.
     radius = 0.5 * np.hypot(ny, nx) * scale / 3600.0 + 0.5
 
-    ra = np.asarray(catalogue["ra"], dtype=float)
-    dec = np.asarray(catalogue["dec"], dtype=float)
-    mag = _brightness(catalogue)
+    ra = np.asarray(catalog["ra"], dtype=float)
+    dec = np.asarray(catalog["dec"], dtype=float)
+    mag = _brightness(catalog)
 
     h = frame.header
     if h.get("RA") is not None and h.get("DEC") is not None:
@@ -785,26 +785,26 @@ def _field_sources(frame, catalogue):
         ra, dec, mag = ra[near], dec[near], mag[near]
 
     order = np.argsort(mag)
-    return ra[order], dec[order], len(catalogue)
+    return ra[order], dec[order], len(catalog)
 
 
-def _brightness(catalogue):
-    """A magnitude to rank catalogue sources by; all-equal if the table has none.
+def _brightness(catalog):
+    """A magnitude to rank catalog sources by; all-equal if the table has none.
 
     Masked and non-finite magnitudes sort last rather than being dropped: a source with
-    no catalogue magnitude is still a perfectly good astrometric reference, it just
+    no catalog magnitude is still a perfectly good astrometric reference, it just
     should not displace a known-bright one from the asterism list.
     """
     for column in ("phot_g_mean_mag", "v_jkc_mag", "g_mag", "mag"):
-        if column in catalogue.colnames:
-            values = np.ma.getdata(catalogue[column]).astype(float)
-            values = np.where(np.ma.getmaskarray(catalogue[column]), np.inf, values)
+        if column in catalog.colnames:
+            values = np.ma.getdata(catalog[column]).astype(float)
+            values = np.where(np.ma.getmaskarray(catalog[column]), np.inf, values)
             return np.where(np.isfinite(values), values, np.inf)
-    return np.zeros(len(catalogue), dtype=float)
+    return np.zeros(len(catalog), dtype=float)
 
 
 def solve_from_sources(frame, x, y, api_key=None, force=False, solver="nova",
-                       astap_exe=None, catalogue=None):
+                       astap_exe=None, catalog=None):
     """Solve using an already-measured source list where the solver can use one.
 
     ASTAP detects its own stars, so the source list is simply ignored there; this
@@ -815,29 +815,29 @@ def solve_from_sources(frame, x, y, api_key=None, force=False, solver="nova",
     if solver == "nova":
         return solve_nova(frame, x, y, api_key=api_key, force=force)
     if solver == "local":
-        return solve_local(frame, _require_catalogue(catalogue), x=x, y=y, force=force)
+        return solve_local(frame, _require_catalog(catalog), x=x, y=y, force=force)
     raise ValueError(
         f"unknown solver {solver!r} (expected 'astap', 'nova' or 'local')"
     )
 
 
-def _require_catalogue(catalogue):
-    """The catalogue, or an error saying how to supply one."""
-    if catalogue is None:
+def _require_catalog(catalog):
+    """The catalog, or an error saying how to supply one."""
+    if catalog is None:
         raise ValueError(
-            "solver='local' needs a reference catalogue: pass catalogue=, or let "
-            "pipeline.solve_all supply it from Project.catalogue()"
+            "solver='local' needs a reference catalog: pass catalog=, or let "
+            "pipeline.solve_all supply it from Project.catalog()"
         )
-    return catalogue
+    return catalog
 
 
 def solve(frame, solver="astap", api_key=None, force=False, astap_exe=None,
-          thresh=2.0, catalogue=None):
+          thresh=2.0, catalog=None):
     """Solve (or load cached) a WCS for a frame. The general entry point.
 
     ``solver="lift"`` copies a trustworthy header solution instead of solving.
     ``"local"`` and ``"nova"`` both extract the frame first -- one to pair against
-    ``catalogue``, the other to build the source list it uploads; ``"astap"`` detects
+    ``catalog``, the other to build the source list it uploads; ``"astap"`` detects
     its own stars and needs neither.
     """
     if not force:
@@ -851,7 +851,7 @@ def solve(frame, solver="astap", api_key=None, force=False, astap_exe=None,
     if solver == "local":
         # `thresh` is not forwarded: it is the photometry's detection threshold, and the
         # solver wants a much higher one. See `detect_for_solve`.
-        return solve_local(frame, _require_catalogue(catalogue), force=force)
+        return solve_local(frame, _require_catalog(catalog), force=force)
     if solver == "nova":
         from . import photometry
 

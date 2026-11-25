@@ -43,7 +43,7 @@ No.  Name        Type          Dimensions      Notes
   2  GREEN       ImageHDU      (1080, 1920)
   3  BLUE        ImageHDU      (1080, 1920)
   4  FOOTPRINT   ImageHDU      (1080, 1920)    coverage map, uint8 -- NOT a science plane
-  5  STAR-TAB    BinTableHDU   469R x 36C      the server's own SEP + Gaia catalogue
+  5  STAR-TAB    BinTableHDU   469R x 36C      the server's own SEP + Gaia catalog
 ```
 
 Three traps here:

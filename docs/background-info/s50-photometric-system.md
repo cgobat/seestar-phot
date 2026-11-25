@@ -1,10 +1,10 @@
 # The Seestar S50 photometric system
 
-The S50 is a colour camera behind a fixed UV/IR-cut filter. Its three Bayer planes are a
+The S50 is a color camera behind a fixed UV/IR-cut filter. Its three Bayer planes are a
 photometric system in their own right — a system nobody has calibrated, because nobody
 sells standard stars in it. This page measures where that system sits against
 Johnson-Kron-Cousins and SDSS, gives the conversions between them, asks whether those
-conversions need more than a linear colour term, and shows what calibrating against the
+conversions need more than a linear color term, and shows what calibrating against the
 S50's own bands does to the zero point of a real stack.
 
 Everything here comes from **one source and one integrator**. Every magnitude — S50, JKC
@@ -33,7 +33,7 @@ carefully standardised one, and no transformation here is better than it.
 ```{figure} figures/passbands.png
 :alt: S50 R, G and B passbands drawn against Johnson-Kron-Cousins BVRI and SDSS gri.
 
-The S50's total-system response (filled, coloured) against the classical and Sloan
+The S50's total-system response (filled, colored) against the classical and Sloan
 systems (grey outlines). The S50 curves are the sensor's Bayer dyes times the modelled
 UV/IR-cut; the red edge at 693 nm is fitted from our own frames, not taken from a
 datasheet.
@@ -55,8 +55,8 @@ the band actually observes at rather than the midpoint of its edges.
 Three things follow, and they drive everything else on this page.
 
 **The three bands are bunched.** B_S50 to R_S50 spans 506–625 nm, 119 nm end to end. The
-SDSS g-to-r baseline alone is 145 nm, and B-to-R in JKC is 205 nm. The S50 measures colour
-over a shorter lever arm than either standard system, so its colours are intrinsically less
+SDSS g-to-r baseline alone is 145 nm, and B-to-R in JKC is 205 nm. The S50 measures color
+over a shorter lever arm than either standard system, so its colors are intrinsically less
 sensitive — and any conversion *out* of it is an extrapolation in wavelength.
 
 **G_S50 is nearly V, and R_S50 is nearly Sloan r.** G_S50 sits 8 nm from Johnson V, and
@@ -72,14 +72,14 @@ curves with nothing underneath.
 
 ## Converting to JKC and SDSS
 
-The transformations are expressed in **B_S50 − R_S50**, the S50's own colour. That is the
+The transformations are expressed in **B_S50 − R_S50**, the S50's own color. That is the
 whole point of a transformation: a relation keyed on BP−RP or B−V would require the
 observer to already have the photometry they are trying to obtain. Written as
 
     target - S50_band = c0 + c1 x + c2 x^2 + c3 x^3,     x = B_S50 - R_S50
 
 ```{figure} figures/transformations.png
-:alt: Six density panels of standard-minus-S50 magnitude against S50 colour, with linear and cubic fits.
+:alt: Six density panels of standard-minus-S50 magnitude against S50 color, with linear and cubic fits.
 
 Each conversion over 235,740 stars, with the linear (dashed) and cubic (solid) fits. The
 quoted rms is the sigma-clipped residual scatter. Note the vertical scales: the whole
@@ -125,7 +125,7 @@ already produced corrections a magnitude beyond anything the data supported. If 
 is redder than 1.65, the honest answer is that this page does not cover it.
 :::
 
-## Does it need more than a linear colour term?
+## Does it need more than a linear color term?
 
 ```{figure} figures/polynomial-order.png
 :alt: Residual rms against polynomial degree for each conversion, in two panels for JKC and SDSS.
@@ -141,10 +141,10 @@ academic for a single frame.
   B_JKC from 48.4 to 14.6 mmag and g_SDSS from 44.2 to 8.8 mmag, factors of 3.3 and 5.0.
   The relation is visibly curved in the figure above, and it curves for a physical reason:
   B_S50's red tail means the band's effective wavelength itself slides redward as a star
-  gets redder, so the offset to a narrow blue band cannot be linear in colour.
+  gets redder, so the offset to a narrow blue band cannot be linear in color.
 - **R_S50 → r_SDSS: linear is already close, quadratic finishes it.** 9.0 → 4.2 mmag from
   degree 1 to 2, and degree 3 buys 0.2 mmag more. The bands nearly coincide, so there is
-  little for the colour term to do.
+  little for the color term to do.
 - **R_S50 → R_JKC and G_S50 → V_JKC: modest gains, and the quadratic is not where they
   come from.** R_JKC goes 8.5 → 8.2 → 6.9 mmag; V_JKC goes 11.5 → 6.6 → 5.0. Note V's
   jump is at degree 2 while R's is at degree 3.
@@ -161,7 +161,7 @@ split appears in `V − G_S50`, and much more violently in the bands beyond the 
 
 That is not fit error. It is M dwarfs separating from giants: below about 4000 K, TiO and
 VO bands carve up the 600–800 nm region, and how much they bite depends on surface gravity
-as well as temperature. A single colour cannot tell those two populations apart, so *no*
+as well as temperature. A single color cannot tell those two populations apart, so *no*
 polynomial in B_S50 − R_S50 can follow both branches — the residual floor there is set by
 the parameterisation, not by the degree.
 
@@ -181,9 +181,9 @@ need those bands, you need a different filter, not a better polynomial.
 
 The reason any of this matters is calibration. The standard path fits
 
-    V = m_inst + ZP + k (colour)
+    V = m_inst + ZP + k (color)
 
-against a reference catalogue, and `k` exists to absorb the mismatch between the
+against a reference catalog, and `k` exists to absorb the mismatch between the
 instrument's band and the reference's. If the reference *is* the instrument's band, there
 is nothing for `k` to absorb.
 
@@ -196,7 +196,7 @@ what the reference leaves behind rather than something the fit has already remov
 :alt: Zero-point residual against BP-RP for three Bayer planes, comparing classical and S50 references.
 
 `n2_c17_dither` 15-minute stack, 238 calibrators, V ∈ [9.5, 13.0), SNR > 30, unblended,
-unsaturated, non-variable. The colour axis is BP−RP — deliberately *not* an S50 colour,
+unsaturated, non-variable. The color axis is BP−RP — deliberately *not* an S50 color,
 which would be testing the S50 reference against itself. Scatter is 3σ-clipped.
 ```
 
@@ -207,7 +207,7 @@ which would be testing the S50 reference against itself. Scatter is 3σ-clipped.
 | **R** | 86 mmag, slope −0.126 | 42 mmag, slope +0.003 | 2.0× tighter |
 
 The B plane is the headline: against Johnson B its residuals run up a **+0.58 mag/mag**
-ramp across the field's colour range, and simply changing the reference collapses that to
+ramp across the field's color range, and simply changing the reference collapses that to
 +0.028 and cuts the scatter by a factor of eight. But the more telling number is the
 right-hand column — **all three planes land on 42–45 mmag**, within 3 mmag of each other,
 once each is calibrated against its own band. That common floor is the frame's own
@@ -218,7 +218,7 @@ classical band it was being forced onto.
 :::{admonition} The blend cut is doing a lot of this work
 :class: caution
 
-"Unblended" in the caption means no catalogue neighbour within 1.5 aperture radii that is
+"Unblended" in the caption means no catalog neighbour within 1.5 aperture radii that is
 less than 2.5 mag fainter. Drop it and this frame's G-plane scatter goes from 45 to 100
 mmag, and the deep stack below from 87 to 164. At 2.4 arcsec/px with a ~10 arcsec FWHM a
 blended aperture is measuring two stars, and in a Galactic-plane field like 20 Cep it is
@@ -226,9 +226,9 @@ blended aperture is measuring two stars, and in a Galactic-plane field like 20 C
 expensive.
 :::
 
-### Seen against magnitude instead of colour
+### Seen against magnitude instead of color
 
-The residual-against-colour view above answers "is the reference on the right system". The
+The residual-against-color view above answers "is the reference on the right system". The
 complementary view — per-star zero point against reference magnitude — answers "does the
 zero point mean the same thing at every brightness", and shows every way a calibration can
 fail in one frame.
@@ -276,17 +276,17 @@ under different conditions.
 | R | 126 mmag | 87 mmag | −0.131 | −0.003 |
 
 All three planes land on the same **84–87 mmag** floor once they are calibrated against
-their own band, and all three colour terms collapse to within 0.01 mag/mag of zero — the
+their own band, and all three color terms collapse to within 0.01 mag/mag of zero — the
 same pattern as the single frame, over 57 of them.
 
 These rms values are *unclipped* standard deviations, which is why they sit above the
 3σ-clipped 42–45 mmag quoted for the single frame; the two columns are comparable to each
 other but not to that table. What is comparable either way is the collapse of the spread
-between planes, and the colour terms.
+between planes, and the color terms.
 
 ## Using this
 
-`gaiadb` carries `r_s50_mag`, `g_s50_mag` and `b_s50_mag` for every catalogue source with
+`gaiadb` carries `r_s50_mag`, `g_s50_mag` and `b_s50_mag` for every catalog source with
 a Gaia sampled XP spectrum, so the S50-reference calibration above needs no transformation
 at all — see [astrometry-and-gaia](../astrometry-and-gaia.md). The transformations on this
 page are for the other direction: **reporting** an S50 measurement to someone who works in
@@ -294,12 +294,12 @@ V or r.
 
 Three caveats worth carrying:
 
-- The S50 columns exist only below **G = 15.0**, which is 23% of the catalogue. Fainter
-  calibrators still have to go through `v_jkc_mag` and a fitted colour term.
+- The S50 columns exist only below **G = 15.0**, which is 23% of the catalog. Fainter
+  calibrators still have to go through `v_jkc_mag` and a fitted color term.
 - The passband model behind all of this has one fitted parameter that is not tightly
   pinned: the blue dye's red-tail scale, adopted at ×1.15 between a three-stack estimate of
   1.18 and a 57-stack estimate of 1.12. The B-plane transformations are the ones that
   depend on it.
 - Nothing in the calibration path reads the S50 columns yet. `calibration.fit_zeropoint`
-  still fits V with a colour term, which is why the numbers above were produced by
+  still fits V with a color term, which is why the numbers above were produced by
   `tools/build_s50_system_figures.py` rather than by the pipeline.

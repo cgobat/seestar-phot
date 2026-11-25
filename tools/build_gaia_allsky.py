@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""Build the all-sky Gaia catalogue by joining GSPC photometry onto existing positions.
+"""Build the all-sky Gaia catalog by joining GSPC photometry onto existing positions.
 
 The obvious route -- bulk-download everything -- does not work here, and the reason is
 worth writing down because it is counter-intuitive.
 
-What the catalogue needs comes from two Gaia tables. ``synthetic_photometry_gspc`` has
-the synthetic Johnson V and the colour, and bulk-downloads as 44 files totalling ~42 GB.
+What the catalog needs comes from two Gaia tables. ``synthetic_photometry_gspc`` has
+the synthetic Johnson V and the color, and bulk-downloads as 44 files totalling ~42 GB.
 ``gaia_source`` has the positions and proper motions, and bulk-downloads as 3387 files
 totalling **~790 GB** -- 152 columns for 1.8 billion rows, to keep 6 columns for the 220
 million that have synthetic photometry. Neither table alone is enough: GSPC carries no

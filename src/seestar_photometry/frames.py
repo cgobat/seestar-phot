@@ -18,7 +18,7 @@ representation -- a ``(3, ny, nx)`` float32 array in R, G, B order:
     The CrowdSky platform re-stacks and plate-solves, then writes a multi-extension
     file: an **empty** primary HDU carrying all the metadata, then ``RED``,
     ``GREEN``, ``BLUE`` ``ImageHDU``\\ s, usually a ``FOOTPRINT`` coverage plane, and
-    a ``STAR-TAB`` binary table holding the server's own SEP catalogue already
+    a ``STAR-TAB`` binary table holding the server's own SEP catalog already
     cross-matched to Gaia.
 
 Because the ``"mef"`` primary HDU holds no image, **the image shape must always come
@@ -38,14 +38,14 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 from astropy.io import fits
 
-#: Order of the colour planes along axis 0. Green (index 1) is the science band.
+#: Order of the color planes along axis 0. Green (index 1) is the science band.
 BANDS = ("R", "G", "B")
 
 #: ``EXTNAME``\\ s accepted for each science plane in the multi-extension layout,
 #: in ``BANDS`` order. Matched case-insensitively.
 _PLANE_NAMES = (("RED", "R"), ("GREEN", "G"), ("BLUE", "B"))
 
-#: Extension holding the server's own source catalogue (multi-extension layout).
+#: Extension holding the server's own source catalog (multi-extension layout).
 _STAR_TAB = "STAR-TAB"
 
 #: Derived planes that must never be mistaken for a science plane.
@@ -73,7 +73,7 @@ class SeestarFrame:
         ``"cube"`` (native stack), ``"mef"`` (CrowdSky) or ``"bayer"`` (raw sub,
         demosaiced on load). See the module docstring.
     star_tab : astropy.table.Table or None
-        The ``STAR-TAB`` catalogue, when the file carries one (CrowdSky only): the
+        The ``STAR-TAB`` catalog, when the file carries one (CrowdSky only): the
         server's SEP detections with ``x``, ``y``, ``flux``, ``ra``, ``dec`` and
         Gaia cross-match columns. Useful as an independent cross-check of our own
         extraction, and as a source list for a WCS solve.
@@ -117,7 +117,7 @@ def _normalise_cube(data):
     (FITS ``NAXIS3=3`` becomes numpy axis 0), and that is the fast path. The
     channel-*last* transpose is cheap insurance for exports that have been through
     an image library, where ``(ny, nx, 3)`` is the natural convention -- getting
-    this wrong silently swaps a colour plane for an image row, which would look
+    this wrong silently swaps a color plane for an image row, which would look
     like a catastrophic PSF rather than a load error.
     """
     if data.ndim != 3:
@@ -127,7 +127,7 @@ def _normalise_cube(data):
     elif data.shape[-1] == 3:
         cube = np.moveaxis(data, -1, 0)
     else:
-        raise ValueError(f"no length-3 colour axis in cube of shape {data.shape}")
+        raise ValueError(f"no length-3 color axis in cube of shape {data.shape}")
     return np.ascontiguousarray(cube, dtype=np.float32)
 
 
@@ -137,7 +137,7 @@ def _plane_index(hdul):
     Resolved by ``EXTNAME`` (``RED``/``GREEN``/``BLUE``, or bare ``R``/``G``/``B``),
     falling back to the first three 2-D image HDUs in file order. ``FOOTPRINT`` and
     other derived planes are never candidates -- including one would shift the
-    colour assignment by one plane.
+    color assignment by one plane.
     """
     by_name = {}
     for i, hdu in enumerate(hdul):
@@ -168,7 +168,7 @@ def _plane_index(hdul):
 
 
 def _read_star_tab(hdul):
-    """The ``STAR-TAB`` catalogue as a Table, or ``None`` if absent."""
+    """The ``STAR-TAB`` catalog as a Table, or ``None`` if absent."""
     for hdu in hdul:
         if str(hdu.header.get("EXTNAME", "")).upper() == _STAR_TAB:
             from astropy.table import Table
@@ -180,7 +180,7 @@ def _read_star_tab(hdul):
 def load_frame(path, pattern=None):
     """Load a Seestar frame from any of the three FITS layouts.
 
-    The colour planes are promoted to float32 so downstream arithmetic can't
+    The color planes are promoted to float32 so downstream arithmetic can't
     overflow the native uint16 storage, and are always returned as
     ``(3, ny, nx)`` in R, G, B order. The header is always the primary HDU's.
 

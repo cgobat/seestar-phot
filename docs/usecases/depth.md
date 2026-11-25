@@ -35,7 +35,7 @@ source-masked apertures on the final background-subtracted image, using the scie
 aperture radius. This captures spatial covariance present in the image. The
 historical independent-pixel estimate ran roughly 0.7 mag optimistic on the tested
 stacks. A blank-aperture limit is still not a recovery/completeness measurement,
-and the standard-system magnitude is quoted at the calibration's fiducial colour.
+and the standard-system magnitude is quoted at the calibration's fiducial color.
 
 Set `Project(depth_kwargs={"n_apertures": 1000, "n_iters": 10, "seed": 42}, ...)`
 to change sampling. Use `build_frame_table(force=True)` to rebuild old or cached

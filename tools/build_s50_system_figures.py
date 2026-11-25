@@ -5,7 +5,7 @@ Answers four questions with measurements rather than assertions:
 
 1. where the S50's R/G/B bands sit against Johnson-Kron-Cousins and SDSS;
 2. what converts an S50 magnitude into one of those systems;
-3. whether that conversion needs a term beyond a linear colour term;
+3. whether that conversion needs a term beyond a linear color term;
 4. what calibrating against the S50's own bands does to the zero-point scatter of a
    real stacked frame.
 
@@ -59,18 +59,18 @@ PARTNER = {"B": ("B_JKC", "g_SDSS"),
            "R": ("R_JKC", "r_SDSS", "i_SDSS", "I_JKC")}
 STANDARD_BANDS = ("B_JKC", "V_JKC", "R_JKC", "I_JKC", "g_SDSS", "r_SDSS", "i_SDSS")
 
-#: Colour the transformations are expressed in. An S50 user can measure this from their
-#: own frames, which is the whole point -- a transformation keyed on a colour you would
+#: Color the transformations are expressed in. An S50 user can measure this from their
+#: own frames, which is the whole point -- a transformation keyed on a color you would
 #: need a different telescope to obtain is not a transformation you can apply.
-COLOUR = ("B", "R")
+COLOR = ("B", "R")
 
-#: Colour range the fits are quoted over: the 1st to 99.5th percentile of the sample.
+#: Color range the fits are quoted over: the 1st to 99.5th percentile of the sample.
 #: Measured rather than chosen -- above 1.65 the sample is 0.5% of the stars and a cubic
 #: fitted over a wider range does not interpolate there, it extrapolates, which is how a
 #: transformation ends up confidently wrong on exactly the red stars it was meant to fix.
-COLOUR_RANGE = (0.0, 1.65)
+COLOR_RANGE = (0.0, 1.65)
 
-#: Polynomial degrees compared when asking whether a linear colour term is enough.
+#: Polynomial degrees compared when asking whether a linear color term is enough.
 DEGREES = (1, 2, 3)
 
 
@@ -115,7 +115,7 @@ def build_sample(work, src, n_files, quiet=False):
 
         # Gaia's own GSPC V, so the synthesis can be checked against the scale the
         # package actually calibrates on rather than only against itself.
-        gaia = _catalogue_columns(ids, src)
+        gaia = _catalog_columns(ids, src)
         row.update(gaia)
         chunks.append(Table(row))
         if not quiet:
@@ -126,7 +126,7 @@ def build_sample(work, src, n_files, quiet=False):
     return out
 
 
-def _catalogue_columns(ids, src):
+def _catalog_columns(ids, src):
     """``phot_g_mean_mag`` and Gaia's ``v_jkc_mag`` for these ids, nan where absent."""
     import pyarrow.parquet as pq
 
@@ -150,37 +150,37 @@ def _catalogue_columns(ids, src):
 
 # --- stage 2: the fits --------------------------------------------------------------------
 
-def clipped_polyfit(colour, delta, degree, n_sigma=3.0, passes=2):
-    """Polynomial fit of ``delta`` on ``colour`` with sigma clipping.
+def clipped_polyfit(color, delta, degree, n_sigma=3.0, passes=2):
+    """Polynomial fit of ``delta`` on ``color`` with sigma clipping.
 
     Returns ``(coefficients, rms, n_used, keep_mask)``. Clipped rather than plain least
     squares because the sample is real stars: a few percent are blends, emission-line
     objects or have a bad XP solution, and they would otherwise set the slope.
     """
-    keep = np.isfinite(colour) & np.isfinite(delta)
+    keep = np.isfinite(color) & np.isfinite(delta)
     for _ in range(passes):
-        coef = np.polyfit(colour[keep], delta[keep], degree)
-        resid = delta - np.polyval(coef, colour)
+        coef = np.polyfit(color[keep], delta[keep], degree)
+        resid = delta - np.polyval(coef, color)
         scatter = np.std(resid[keep])
         keep = keep & (np.abs(resid) < n_sigma * scatter)
-    coef = np.polyfit(colour[keep], delta[keep], degree)
-    resid = delta[keep] - np.polyval(coef, colour[keep])
+    coef = np.polyfit(color[keep], delta[keep], degree)
+    resid = delta[keep] - np.polyval(coef, color[keep])
     return coef, float(np.std(resid)), int(keep.sum()), keep
 
 
 def transformations(sample):
     """Fit every S50 -> standard conversion at each degree. Returns a list of rows."""
-    colour = np.asarray(sample[f"{COLOUR[0]}_S50"]) - np.asarray(sample[f"{COLOUR[1]}_S50"])
-    inside = (colour >= COLOUR_RANGE[0]) & (colour <= COLOUR_RANGE[1])
+    color = np.asarray(sample[f"{COLOR[0]}_S50"]) - np.asarray(sample[f"{COLOR[1]}_S50"])
+    inside = (color >= COLOR_RANGE[0]) & (color <= COLOR_RANGE[1])
 
     rows = []
     for band in S50_BANDS:
         source = np.asarray(sample[f"{band}_S50"])
         for target in PARTNER[band]:
             delta = np.asarray(sample[target]) - source
-            good = inside & np.isfinite(delta) & np.isfinite(colour)
+            good = inside & np.isfinite(delta) & np.isfinite(color)
             for degree in DEGREES:
-                coef, rms, n, _ = clipped_polyfit(colour[good], delta[good], degree)
+                coef, rms, n, _ = clipped_polyfit(color[good], delta[good], degree)
                 rows.append({"s50_band": band, "target": target, "degree": degree,
                              "coef": coef, "rms": rms, "n": n})
     return rows
@@ -235,7 +235,7 @@ def write_coefficients(out_dir, fits):
     table.meta["comments"] = [
         "S50 -> standard-system transformations, delta = target - S50_band, as",
         f"delta = sum_i c_i * x^i with x = B_S50 - R_S50 over "
-        f"[{COLOUR_RANGE[0]}, {COLOUR_RANGE[1]}].",
+        f"[{COLOR_RANGE[0]}, {COLOR_RANGE[1]}].",
         "All magnitudes are AB and synthesised from the same Gaia XP spectra.",
         "rms is the sigma-clipped residual scatter of the fit.",
         "Built by tools/build_s50_system_figures.py.",
@@ -280,18 +280,18 @@ ENCLOSED = 0.95
 
 
 def measure_frame(frame_path, src, quiet=False):
-    """Forced photometry of one stack against the ``v2`` catalogue, **unfiltered**.
+    """Forced photometry of one stack against the ``v2`` catalog, **unfiltered**.
 
-    Returns a per-plane dict of equal-length arrays: every catalogue source that landed
+    Returns a per-plane dict of equal-length arrays: every catalog source that landed
     on the chip, with the flags a calibrator cut needs rather than the cut applied. The
     zero-point-linearity figure needs the saturated and the faint ends that
     :func:`calibrator_mask` throws away, so the cut lives outside the measurement.
 
-    The catalogue comes from :func:`gaiadb.cone` on the built ``v2`` dataset -- which is
+    The catalog comes from :func:`gaiadb.cone` on the built ``v2`` dataset -- which is
     the point, since that dataset is what a user would have -- joined to ``bp_rp`` and
     ``phot_variable_flag`` from the field's TAP result. Those two columns are absent from
     the all-sky build (they live only in ``gaia_source``), and BP-RP in particular has to
-    come from outside: a colour axis built from the S50 bands would be testing the S50
+    come from outside: a color axis built from the S50 bands would be testing the S50
     reference against itself.
     """
     from astropy.table import Table, join
@@ -302,22 +302,22 @@ def measure_frame(frame_path, src, quiet=False):
 
     ny, nx = frame.shape
     centre = wcs.pixel_to_world(nx / 2, ny / 2)
-    catalogue = gaiadb.cone((centre.ra.deg, centre.dec.deg), 1.7, directory=src)
+    catalog = gaiadb.cone((centre.ra.deg, centre.dec.deg), 1.7, directory=src)
     extra = Table.read(r"D:/CrowdSky/crowdsky-workspace/Repos/photometry-adventures-2"
                        r"/paper/data/gaia_20Cep.ecsv")["source_id", "bp_rp",
                                                        "phot_variable_flag"]
     # Both columns exist in the schema but are entirely masked in the all-sky build, and
     # a join would silently rename the pair to bp_rp_1/bp_rp_2 rather than fill them.
-    catalogue.remove_columns(["bp_rp", "phot_variable_flag"])
-    catalogue = join(catalogue, extra, keys="source_id", join_type="inner")
-    inframe = catalogs.sources_in_frame(catalogue, wcs, frame)
+    catalog.remove_columns(["bp_rp", "phot_variable_flag"])
+    catalog = join(catalog, extra, keys="source_id", join_type="inner")
+    inframe = catalogs.sources_in_frame(catalog, wcs, frame)
     if not quiet:
-        print(f"  {frame_path.name}: {len(inframe)} catalogue sources on the frame")
+        print(f"  {frame_path.name}: {len(inframe)} catalog sources on the frame")
 
     phot = photometry.forced_photometry(
         frame, inframe["ra"], inframe["dec"], wcs,
         source_id=inframe["source_id"], enclosed=ENCLOSED)
-    blended = _blend_flag(inframe, catalogue, phot.meta["aperture"][1],
+    blended = _blend_flag(inframe, catalog, phot.meta["aperture"][1],
                           astrometry.pixel_scale(frame))
     if not quiet:
         print(f"  aperture {phot.meta['aperture'][1]:.2f} px (green), "
@@ -361,15 +361,15 @@ BLEND_APER = 1.5
 BLEND_DMAG = 2.5
 
 
-def _blend_flag(inframe, catalogue, aperture_px, pixel_scale):
-    """True where a catalogue neighbour sits close enough to contaminate the aperture."""
+def _blend_flag(inframe, catalog, aperture_px, pixel_scale):
+    """True where a catalog neighbour sits close enough to contaminate the aperture."""
     import astropy.units as u
     from astropy.coordinates import SkyCoord
 
     radius = BLEND_APER * aperture_px * pixel_scale
     here = SkyCoord(inframe["ra"], inframe["dec"], unit="deg")
-    everything = SkyCoord(catalogue["ra"], catalogue["dec"], unit="deg")
-    g_all = np.asarray(catalogue["phot_g_mean_mag"], float)
+    everything = SkyCoord(catalog["ra"], catalog["dec"], unit="deg")
+    g_all = np.asarray(catalog["phot_g_mean_mag"], float)
     g_here = np.asarray(inframe["phot_g_mean_mag"], float)
 
     i_all, i_here, sep, _ = here.search_around_sky(everything, radius * u.arcsec)
@@ -408,11 +408,11 @@ def frame_calibrators(frame_path, src, quiet=False):
     return out
 
 
-def zeropoint_fit(reference, m_inst, colour):
-    """Median zero point, then the residual slope against colour.
+def zeropoint_fit(reference, m_inst, color):
+    """Median zero point, then the residual slope against color.
 
     Deliberately *not* the package's :func:`calibration.fit_zeropoint`, which fits the
-    colour term as a free parameter. The question here is how large a colour term the
+    color term as a free parameter. The question here is how large a color term the
     reference leaves behind, so the zero point is taken as a median and the slope is
     measured on what is left.
     """
@@ -420,8 +420,8 @@ def zeropoint_fit(reference, m_inst, colour):
     offset = np.median(zp)
     resid = zp - offset
     keep = np.abs(resid - np.median(resid)) < 3 * np.std(resid)
-    slope, _ = np.polyfit(colour[keep], resid[keep], 1), None
-    err = np.sqrt(np.diag(np.polyfit(colour[keep], resid[keep], 1, cov=True)[1]))[0]
+    slope, _ = np.polyfit(color[keep], resid[keep], 1), None
+    err = np.sqrt(np.diag(np.polyfit(color[keep], resid[keep], 1, cov=True)[1]))[0]
     return {"zp": float(offset), "resid": resid, "keep": keep,
             "slope": float(slope[0]), "slope_err": float(err),
             "rms": float(np.std(resid[keep])), "n": int(keep.sum()),
@@ -436,7 +436,7 @@ def zeropoint_fit(reference, m_inst, colour):
 #: The two calibration schemes being compared, everywhere they appear. Slots 0 and 1 of
 #: the house categorical palette, validated as a pair (worst adjacent CVD dE 24.7,
 #: protan). Band identity is carried by the panel title, never by these hues, so the
-#: same two colours mean the same two things in every panel.
+#: same two colors mean the same two things in every panel.
 SCHEME = {
     "jkc": {"color": _style.CATEGORICAL[1], "marker": "o", "ls": "--",
             "label": "classical reference (JKC)"},
@@ -496,9 +496,9 @@ def figure_transformations(out_dir, sample, fits):
     """Each conversion as a density, with the linear and cubic fits over it."""
     import matplotlib.pyplot as plt
 
-    colour = (np.asarray(sample[f"{COLOUR[0]}_S50"])
-              - np.asarray(sample[f"{COLOUR[1]}_S50"]))
-    grid = np.linspace(*COLOUR_RANGE, 200)
+    color = (np.asarray(sample[f"{COLOR[0]}_S50"])
+              - np.asarray(sample[f"{COLOR[1]}_S50"]))
+    grid = np.linspace(*COLOR_RANGE, 200)
     by_key = {(r["s50_band"], r["target"], r["degree"]): r for r in fits}
 
     with plt.rc_context(_style.rc()):
@@ -508,19 +508,19 @@ def figure_transformations(out_dir, sample, fits):
                 target = [t for t in PARTNER[band] if t.endswith(system)][0]
                 ax = axes[row, col]
                 delta = np.asarray(sample[target]) - np.asarray(sample[f"{band}_S50"])
-                good = (np.isfinite(delta) & (colour >= COLOUR_RANGE[0])
-                        & (colour <= COLOUR_RANGE[1]))
+                good = (np.isfinite(delta) & (color >= COLOR_RANGE[0])
+                        & (color <= COLOR_RANGE[1]))
                 lo, hi = np.percentile(delta[good], [0.2, 99.8])
                 pad = 0.08 * (hi - lo)
-                ax.hexbin(colour[good], delta[good], gridsize=90, bins="log",
+                ax.hexbin(color[good], delta[good], gridsize=90, bins="log",
                           cmap=_density_cmap(), linewidths=0, mincnt=1,
-                          extent=(*COLOUR_RANGE, lo, hi))
+                          extent=(*COLOR_RANGE, lo, hi))
                 for degree, style in ((1, "--"), (3, "-")):
                     row_fit = by_key[(band, target, degree)]
                     ax.plot(grid, np.polyval(row_fit["coef"], grid), ls=style, lw=1.6,
                             color=_style.MODEL,
                             label=f"degree {degree}" if (row == 0 and col == 0) else None)
-                ax.set_xlim(*COLOUR_RANGE)
+                ax.set_xlim(*COLOR_RANGE)
                 ax.set_ylim(lo - pad, hi + pad)
                 d1 = 1000 * by_key[(band, target, 1)]["rms"]
                 d3 = 1000 * by_key[(band, target, 3)]["rms"]
@@ -541,7 +541,7 @@ def figure_transformations(out_dir, sample, fits):
 
 
 def figure_polynomial_order(out_dir, fits):
-    """Does the conversion need more than a linear colour term?"""
+    """Does the conversion need more than a linear color term?"""
     import matplotlib.pyplot as plt
 
     with plt.rc_context(_style.rc()):
@@ -575,7 +575,7 @@ def figure_polynomial_order(out_dir, fits):
 
 
 def figure_frame_zeropoint(out_dir, planes):
-    """The payoff: residual against colour for one stack, both references."""
+    """The payoff: residual against color for one stack, both references."""
     import matplotlib.pyplot as plt
 
     with plt.rc_context(_style.rc()):

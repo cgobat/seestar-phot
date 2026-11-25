@@ -1,6 +1,6 @@
-"""The catalogue-anchored plate solver, on synthetic frames.
+"""The catalog-anchored plate solver, on synthetic frames.
 
-Injected stars at known pixel positions and a catalogue derived from the same truth
+Injected stars at known pixel positions and a catalog derived from the same truth
 table, so the solve can be checked against the WCS it should have recovered rather than
 against another solver's opinion.
 
@@ -42,8 +42,8 @@ def truth():
 
 
 @pytest.fixture(scope="module")
-def catalogue(truth):
-    return conftest.make_catalogue(truth)
+def catalog(truth):
+    return conftest.make_catalog(truth)
 
 
 def make_frame(directory, truth, name="synth.fit", solved=False, header=None):
@@ -70,7 +70,7 @@ def wcs_disagreement(a, b, shape=(conftest.NY, conftest.NX)):
 
 # --- the two routes to a solution ----------------------------------------------------
 
-def test_solves_from_the_pointing_alone(tmp_path, truth, catalogue):
+def test_solves_from_the_pointing_alone(tmp_path, truth, catalog):
     """No header WCS at all -- the asterism bootstrap has to carry it.
 
     This is the case for anything ``stacking.stack_frame`` produced, and for every
@@ -79,21 +79,21 @@ def test_solves_from_the_pointing_alone(tmp_path, truth, catalogue):
     frame = make_frame(tmp_path, truth, "bootstrap.fit", solved=False)
     assert astrometry._header_wcs(frame) is None, "fixture must have no header WCS"
 
-    wcs = astrometry.solve_local(frame, catalogue)
+    wcs = astrometry.solve_local(frame, catalog)
     assert wcs.has_celestial
     assert wcs_disagreement(wcs, conftest.make_wcs()) < conftest.PIXSCALE / 2
 
 
-def test_solves_from_a_header_wcs(tmp_path, truth, catalogue):
+def test_solves_from_a_header_wcs(tmp_path, truth, catalog):
     """The fast path. Cheaper, and the common case for a plate-solved exporter."""
     frame = make_frame(tmp_path, truth, "fastpath.fit", solved=True)
     assert astrometry._header_wcs(frame) is not None
 
-    wcs = astrometry.solve_local(frame, catalogue)
+    wcs = astrometry.solve_local(frame, catalog)
     assert wcs_disagreement(wcs, conftest.make_wcs()) < conftest.PIXSCALE / 2
 
 
-def test_a_wrong_header_wcs_falls_through_to_the_bootstrap(tmp_path, truth, catalogue):
+def test_a_wrong_header_wcs_falls_through_to_the_bootstrap(tmp_path, truth, catalog):
     """A header solution that is wrong by degrees must not poison the result.
 
     The fast path is a guess, not a trusted input: if too few sources pair up it has to
@@ -104,11 +104,11 @@ def test_a_wrong_header_wcs_falls_through_to_the_bootstrap(tmp_path, truth, cata
     header["CRVAL2"] = float(header["CRVAL2"]) - 2.0
     frame = make_frame(tmp_path, truth, "badheader.fit", header=header)
 
-    wcs = astrometry.solve_local(frame, catalogue)
+    wcs = astrometry.solve_local(frame, catalog)
     assert wcs_disagreement(wcs, conftest.make_wcs()) < conftest.PIXSCALE / 2
 
 
-def test_recovers_a_rotated_field(tmp_path, truth, catalogue):
+def test_recovers_a_rotated_field(tmp_path, truth, catalog):
     """Alt-Az frames rotate; a real bundled stack needed 33 degrees of it."""
     rotated = truth.copy()
     angle = np.radians(40.0)
@@ -122,10 +122,10 @@ def test_recovers_a_rotated_field(tmp_path, truth, catalogue):
     rotated = rotated[inside]
 
     frame = make_frame(tmp_path, rotated, "rotated.fit")
-    wcs = astrometry.solve_local(frame, conftest.make_catalogue(truth))
+    wcs = astrometry.solve_local(frame, conftest.make_catalog(truth))
 
-    # The catalogue is built from the unrotated truth, so the recovered WCS must undo
-    # the rotation: check the stars land where the catalogue says they are.
+    # The catalog is built from the unrotated truth, so the recovered WCS must undo
+    # the rotation: check the stars land where the catalog says they are.
     ra, dec = wcs.all_pix2world(np.asarray(rotated["x"]), np.asarray(rotated["y"]), 0)
     reference = conftest.make_wcs().all_pix2world(
         np.asarray(truth["x"])[inside], np.asarray(truth["y"])[inside], 0
@@ -138,33 +138,33 @@ def test_recovers_a_rotated_field(tmp_path, truth, catalogue):
 
 # --- the sidecar ----------------------------------------------------------------------
 
-def test_caches_a_sidecar_and_reuses_it(tmp_path, truth, catalogue):
+def test_caches_a_sidecar_and_reuses_it(tmp_path, truth, catalog):
     frame = make_frame(tmp_path, truth, "cached.fit")
     cache = astrometry.wcs_cache_path(frame.path)
     assert not cache.exists()
 
-    astrometry.solve_local(frame, catalogue)
+    astrometry.solve_local(frame, catalog)
     assert cache.exists()
     stamp = cache.stat().st_mtime_ns
 
-    astrometry.solve_local(frame, catalogue)
+    astrometry.solve_local(frame, catalog)
     assert cache.stat().st_mtime_ns == stamp, "a cached solve must not rewrite"
 
-    astrometry.solve_local(frame, catalogue, force=True)
+    astrometry.solve_local(frame, catalog, force=True)
     assert astrometry.load_wcs(frame).has_celestial
 
 
-def test_reached_through_the_solve_dispatch(tmp_path, truth, catalogue):
+def test_reached_through_the_solve_dispatch(tmp_path, truth, catalog):
     frame = make_frame(tmp_path, truth, "dispatch.fit")
-    wcs = astrometry.solve(frame, solver="local", catalogue=catalogue)
+    wcs = astrometry.solve(frame, solver="local", catalog=catalog)
     assert wcs_disagreement(wcs, conftest.make_wcs()) < conftest.PIXSCALE / 2
 
 
 # --- failure is loud -------------------------------------------------------------------
 
-def test_no_catalogue_says_how_to_supply_one(tmp_path, truth):
+def test_no_catalog_says_how_to_supply_one(tmp_path, truth):
     frame = make_frame(tmp_path, truth, "nocat.fit")
-    with pytest.raises(ValueError, match="catalogue"):
+    with pytest.raises(ValueError, match="catalog"):
         astrometry.solve(frame, solver="local")
 
 
@@ -176,25 +176,25 @@ def test_unknown_solver_lists_local(tmp_path, truth):
         astrometry.solve_from_sources(frame, [1.0], [1.0], solver="nope")
 
 
-def test_a_catalogue_for_the_wrong_field_raises(tmp_path, truth, catalogue):
+def test_a_catalog_for_the_wrong_field_raises(tmp_path, truth, catalog):
     """Rather than caching a confident, wrong WCS."""
     header = conftest.make_header("cube")
     header["RA"] = float(header["RA"]) + 40.0
     frame = make_frame(tmp_path, truth, "wrongfield.fit", header=header)
 
     with pytest.raises(RuntimeError, match="could not match"):
-        astrometry.solve_local(frame, catalogue)
+        astrometry.solve_local(frame, catalog)
     assert not astrometry.wcs_cache_path(frame.path).exists()
 
 
-def test_a_frame_with_no_pointing_names_the_alternative(tmp_path, truth, catalogue):
+def test_a_frame_with_no_pointing_names_the_alternative(tmp_path, truth, catalog):
     header = conftest.make_header("cube")
     del header["RA"]
     del header["DEC"]
     frame = make_frame(tmp_path, truth, "nopointing.fit", header=header)
 
     with pytest.raises(RuntimeError, match="astap"):
-        astrometry.solve_local(frame, catalogue)
+        astrometry.solve_local(frame, catalog)
 
 
 def test_detect_for_solve_returns_positions_brightest_first(tmp_path, truth):
@@ -208,7 +208,7 @@ def test_detect_for_solve_returns_positions_brightest_first(tmp_path, truth):
     assert len(astrometry.detect_for_solve(frame, thresh=20.0)) <= len(x)
 
 
-def test_solving_does_not_run_the_photometry(tmp_path, truth, catalogue, monkeypatch):
+def test_solving_does_not_run_the_photometry(tmp_path, truth, catalog, monkeypatch):
     """`extract_sources` costs minutes on a deep wide frame and settles nothing here."""
     from seestar_photometry import photometry
 
@@ -217,7 +217,7 @@ def test_solving_does_not_run_the_photometry(tmp_path, truth, catalogue, monkeyp
 
     monkeypatch.setattr(photometry, "extract_sources", boom)
     frame = make_frame(tmp_path, truth, "nophot.fit")
-    assert astrometry.solve_local(frame, catalogue).has_celestial
+    assert astrometry.solve_local(frame, catalog).has_celestial
 
 
 def test_the_vote_threshold_scales_with_the_background():
@@ -233,9 +233,9 @@ def test_the_vote_threshold_scales_with_the_background():
     assert astrometry._vote_threshold(250, 500, half_px=300) > rich  # tighter search
 
 
-def test_too_few_sources_does_not_produce_a_wcs(tmp_path, truth, catalogue):
+def test_too_few_sources_does_not_produce_a_wcs(tmp_path, truth, catalog):
     """A three-star frame cannot be solved, and must say so rather than guess."""
     frame = make_frame(tmp_path, truth[:3], "sparse.fit")
     with pytest.raises(RuntimeError):
-        astrometry.solve_local(frame, catalogue)
+        astrometry.solve_local(frame, catalog)
     assert not astrometry.wcs_cache_path(frame.path).exists()

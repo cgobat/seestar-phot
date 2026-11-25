@@ -27,7 +27,7 @@ mid-exposure BJD, airmass, flags. Large; you reduce it, never query it for selec
 
 ## Forced photometry, not detect-then-match
 
-Every catalogue position is measured in every frame it lands on, whether or not anything was
+Every catalog position is measured in every frame it lands on, whether or not anything was
 detected there. That matters more than it sounds:
 
 - a star keeps a row in **every** frame, so series never go ragged;
@@ -59,7 +59,7 @@ rotation, so the position-dependent aperture loss largely cancels.
 **Similar brightness** — similar noise, and away from both saturation and the detection floor.
 **Similar colour** — minimises differential-extinction and colour-term residuals.
 
-Catalogue-flagged variables are dropped.
+Catalog-flagged variables are dropped.
 
 ```{admonition} A bigger ensemble is not automatically better
 :class: note
@@ -85,11 +85,11 @@ print(lc["time", "mag", "mag_err", "n_comp"])
 ```
 
 Each frame gets an **ensemble zero point**: the mean over its valid comparisons of
-`(catalogue mag − instrumental mag)`. The target's magnitude is then
+`(catalog mag − instrumental mag)`. The target's magnitude is then
 `m_target + ensemble ZP`. This removes per-frame transparency and ties the target to the
-comparisons' catalogue scale in one step.
+comparisons' catalog scale in one step.
 
-**Each comparison is referenced to its own catalogue magnitude** — not to an ensemble mean
+**Each comparison is referenced to its own catalog magnitude** — not to an ensemble mean
 flux. That is the load-bearing detail. Because of it:
 
 - a comparison dropping in or out between frames does **not** step the zero point;
