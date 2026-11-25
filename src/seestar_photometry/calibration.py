@@ -40,19 +40,19 @@ _BORTLE_SQM = [(21.75, 1), (21.5, 2), (21.25, 3), (20.5, 4),
 
 @dataclass(frozen=True)
 class CalibrationSpec:
-    """Reference system for one camera channel in ``Project.band_calibrations``.
+    """Catalogue reference and colour model for one camera channel.
 
-    ``reference_mag=None`` preserves the legacy V-column cascade. Otherwise the
-    named catalogue column is required, with no fallback to a different system.
-    ``colour_columns`` is a single catalogue column, a pair to subtract, ``()``
-    to disable the colour fit, or ``None`` for the legacy B-R/BP-RP cascade.
-    ``reference_system`` labels the catalogue scale, including AB/Vega where
-    known; it performs no magnitude-system conversion.
+    ``reference_mag=None`` selects the default V column. ``colour_columns`` is
+    a column name, a pair to subtract, ``()`` for no colour term, or ``None``
+    for the legacy JKC B-R / Gaia BP-RP cascade. ``degree`` controls an Astropy
+    Polynomial1D in colour relative to its median. System labels describe the
+    reference catalogue and do not perform AB/Vega conversions.
     """
 
     reference_mag: str = None
     colour_columns: tuple | str = None
     reference_system: str = None
+    degree: int = 1
 
 
 @dataclass
@@ -86,6 +86,11 @@ class Calibration:
     reference_mag: str = "v_jkc_mag"
     reference_system: str = "Johnson V"
     colour_columns: tuple | str = None
+    model: object = None
+
+    @property
+    def degree(self):
+        return self.model.degree if self.model is not None else 1
 
 
 def _pick_v_column(t):
@@ -115,8 +120,8 @@ def _pick_colour(t, columns=None):
         mask = np.ma.getmaskarray(t[names[0]])
         if len(names) == 1:
             return values[0], mask, names[0]
-        mask = mask | np.ma.getmaskarray(t[names[1]])
-        return values[0] - values[1], mask, " - ".join(names)
+        return (values[0] - values[1], mask | np.ma.getmaskarray(t[names[1]]),
+                " - ".join(names))
     cols = t.colnames
     if "b_jkc_mag" in cols and "r_jkc_mag" in cols:
         colour = np.asarray(t["b_jkc_mag"], float) - np.asarray(t["r_jkc_mag"], float)

@@ -244,6 +244,15 @@ class Project:
             return self.catalogue_backend
         from . import gaiadb
 
+        requested = set()
+        for spec in self.band_calibrations.values():
+            if spec.reference_mag is not None:
+                requested.add(spec.reference_mag)
+            columns = spec.colour_columns
+            if columns:
+                requested.update((columns,) if isinstance(columns, str) else columns)
+        if requested.difference(gaiadb.COLUMNS):
+            return "tap"
         return "local" if gaiadb.covers(
             self.target.radec, self.catalogue_radius_deg) else "tap"
 

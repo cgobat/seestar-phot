@@ -107,6 +107,9 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
         "reference_mag": cal.reference_mag,
         "reference_system": cal.reference_system,
         "colour_label": cal.colour_label,
+        "colour_degree": cal.degree,
+        "colour_coefficients": cal.model.parameters if cal.model is not None else
+                               np.array([cal.zeropoint, cal.colour_term]),
         "zeropoint": cal.zeropoint,
         "zeropoint_err": cal.zeropoint_err,
         "colour_term": cal.colour_term,
@@ -145,7 +148,7 @@ def frame_quality(extraction, cal, provenance=None, mask=None, depth_kwargs=None
     # Keep V aliases for legacy consumers without mislabelling another system.
     is_v = cal.reference_mag in ("v_jkc_mag", "v_mag")
     if not is_v:
-        row["bortle"] = np.nan  # V-based Bortle thresholds do not apply to R/B.
+        row["bortle"] = np.nan
     for legacy, generic in (("v_lim_5sigma", "mag_lim_5sigma"),
                             ("v_lim_100sigma", "mag_lim_100sigma"), ("v_sat", "mag_sat")):
         row[legacy] = row[generic] if is_v else np.nan
