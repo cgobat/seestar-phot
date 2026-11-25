@@ -27,6 +27,7 @@ from dataclasses import asdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
+from functools import partial
 
 import numpy as np
 from astropy.table import Table, vstack
@@ -145,13 +146,13 @@ def _drain(executor, kwargs, work_fn, keys, project, counts, problems,
 
 # --- stage 1: WCS ---------------------------------------------------------------------
 
-def _solve_one(key, project):
+def _solve_one(key, project, force=False):
     """Solve and cache one frame's WCS. Returns ``(key, status, message)``."""
     from . import astrometry, frames
 
     path = project.source.path(key)
     try:
-        if astrometry.has_wcs(path):
+        if not force and astrometry.has_wcs(path):
             return key, "cached", None
     except Exception:
         pass  # unreadable sidecar: fall through and re-solve
@@ -165,13 +166,14 @@ def _solve_one(key, project):
     # transient, and re-running SEP on every attempt would multiply the cost of a
     # frame that was never going to solve. A local solve is deterministic, so retrying
     # it is pure waste -- it would fail identically.
-    attempts = 4 if project.solver == "nova" else 1 if project.solver == "local" else 2
+    attempts = 4 if project.solver == "nova" else 2 if project.solver == "astap" else 1
     last = None
     for attempt in range(attempts):
         try:
             astrometry.solve(
                 frame, solver=project.solver, api_key=project.api_key,
-                astap_exe=project.astap_exe, thresh=project.thresh,
+                astap_exe=project.astap_exe, thresh=project.thresh, force=force,
+                solver_options=project.solver_options,
                 catalog=_CATALOG,
             )
             return key, "solved", None
@@ -218,7 +220,7 @@ def solve_all(project, workers=None, force=False, limit=None):
     else:
         pool, workers = "process", workers or max((os.cpu_count() or 4) - 2, 1)
     counts, problems = _run(
-        project, _solve_one, keys, workers=workers, pool=pool, label="solve",
+        project, partial(_solve_one, force=force), keys, workers=workers, pool=pool, label="solve",
         catalog_path=catalog_path,
     )
     return counts, problems

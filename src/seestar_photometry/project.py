@@ -71,8 +71,12 @@ class Project:
     solver : str
         ``"astap"`` (default, local and offline), ``"local"`` (anchored on the reference
         catalog -- no binary, no network, no index files), ``"nova"``
-        (astrometry.net), or ``"lift"`` for frames that already carry a trustworthy
+        (remote astrometry.net), ``"solve-field"`` (local astrometry.net with indexes),
+        or ``"lift"`` for frames that already carry a trustworthy
         header solution.
+    solver_options : dict, optional
+        Keyword options for the selected solver, for example ``executable``,
+        ``config`` and ``timeout`` for ``"solve-field"``. See :func:`astrometry.solve_field`.
     astap_exe : str, optional
         Path to the ASTAP command-line binary. Leave unset and it is located
         automatically: ``$ASTAP_EXE``, then ``PATH`` (which covers ``apt install
@@ -175,6 +179,7 @@ class Project:
     isolation: float = None
     depth_kwargs: dict = field(default_factory=dict)
     band_calibrations: dict = field(default_factory=lambda: {"G": CalibrationSpec()})
+    solver_options: dict = field(default_factory=dict)
 
     def __post_init__(self):
         self.work_dir = Path(self.work_dir)

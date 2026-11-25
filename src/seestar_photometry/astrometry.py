@@ -21,6 +21,9 @@ Several solvers, same sidecar, chosen with ``solver=``:
     the field rotation of Alt-Az frames, and takes ~a second per frame. Still the
     default because it needs no catalog at all.
 
+``"solve-field"``
+    Local astrometry.net CLI with installed index files; no API key required.
+
 ``"nova"``
     astrometry.net's web service, fed our own SEP source list (not the image) with
     the header pointing and pixel scale as hints. Useful as a fallback when ASTAP
@@ -223,6 +226,129 @@ def solve_astap(frame, force=False, astap_exe=None, timeout=120, downsample=(2, 
                 return _write_wcs(wcs.to_header(relax=True), cache)
         tail = (result.stdout or "").strip().splitlines()[-1:] or [result.stderr[-160:]]
         raise RuntimeError(f"ASTAP no solution (rc={result.returncode}): {tail}")
+
+
+def _solver_executable(name, explicit, environment):
+    """Resolve a local CLI from an explicit path, environment variable or PATH."""
+    import shutil
+
+    requested = str(explicit or os.environ.get(environment) or name)
+    found = shutil.which(requested)
+    if found is None:
+        raise RuntimeError(
+            f"cannot find {requested!r}; install {name} and its index files, "
+            f"or set solver_options['executable'] / ${environment}"
+        )
+    return found
+
+
+def _solver_hints(frame, center, radius, scale, scale_err):
+    """Validate optional search hints, using Astropy coordinates and quantities."""
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+
+    if center is None and frame.header.get("RA") is not None and frame.header.get("DEC") is not None:
+        center = (float(frame.header["RA"]), float(frame.header["DEC"]))
+    if center is not None:
+        center = center.icrs if isinstance(center, SkyCoord) else SkyCoord(*center, unit=u.deg)
+        if not center.isscalar or not np.isfinite([center.ra.deg, center.dec.deg]).all():
+            raise ValueError("center must be a finite scalar SkyCoord or (ra, dec) in degrees")
+    radius = u.Quantity(radius, u.deg).to_value(u.deg)
+    if not np.isfinite(radius) or not 0 < radius <= 180:
+        raise ValueError("radius must be in (0, 180] degrees")
+    if scale is None:
+        try:
+            scale = pixel_scale(frame)
+        except KeyError:
+            pass  # optics absent: omit scale hints for a blind solve
+    bounds = None
+    if scale is not None:
+        scale = u.Quantity(scale, u.arcsec / u.pixel).to_value(u.arcsec / u.pixel)
+        if not np.isfinite(scale) or scale <= 0 or not 0 < scale_err < 100:
+            raise ValueError("scale must be positive and scale_err must be in (0, 100) percent")
+        bounds = (scale * (1 - scale_err / 100), scale * (1 + scale_err / 100))
+    return center, radius, bounds
+
+
+def _run_solver(command, timeout):
+    """Run a CLI without a shell; report timeouts and useful failure output."""
+    import subprocess
+
+    if not np.isfinite(timeout) or timeout <= 0:
+        raise ValueError("timeout must be finite and positive")
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"{Path(command[0]).name} timed out after {timeout}s") from exc
+    except OSError as exc:
+        raise RuntimeError(f"could not run {command[0]}: {exc}") from exc
+    if result.returncode:
+        detail = (result.stderr or result.stdout or "").strip()[-1200:]
+        raise RuntimeError(f"{Path(command[0]).name} failed (rc={result.returncode}): {detail}")
+
+
+def _cache_solver_output(output, frame, cache):
+    """Require a fresh, finite, invertible celestial WCS before caching a CLI result."""
+    if not Path(output).is_file():
+        raise RuntimeError("solver produced no WCS output")
+    wcs = WCS(fits.getheader(output), naxis=2)
+    if not wcs.has_celestial:
+        raise RuntimeError("solver produced a non-celestial WCS")
+    wcs = wcs.celestial
+    ny, nx = frame.shape
+    xy = np.array([[0, 0], [nx / 2, ny / 2], [nx - 1, ny - 1]], float)
+    sky = wcs.all_pix2world(xy, 0)
+    recovered = wcs.all_world2pix(sky, 0)
+    if not np.isfinite(sky).all() or not np.allclose(recovered, xy, atol=1e-3, rtol=0):
+        raise RuntimeError("solver produced a non-finite or non-invertible WCS")
+    result = _write_wcs(wcs.to_header(relax=True), cache)
+    frame.ccd.wcs = result
+    return result
+
+
+def solve_field(frame, force=False, executable=None, config=None, timeout=120,
+                band="G", center=None, radius=2.0, scale=None, scale_err=10.0,
+                downsample=2):
+    """Solve locally with astrometry.net's ``solve-field`` executable.
+
+    Requires a separately installed astrometry.net and suitable index files.
+    ``config`` is an optional astrometry.net backend configuration path. Search
+    ``center`` accepts SkyCoord or degrees, ``radius`` degrees or an angular
+    Quantity, and ``scale`` arcsec/pixel or a Quantity. Missing hints are inferred
+    from the frame header when available. ``scale_err`` is a percent half-width.
+
+    The selected RGB plane is written without any input WCS to a private temporary
+    directory. Only a fresh, solved celestial WCS reaches the usual sidecar; the
+    original image is never passed to the executable or modified.
+    """
+    import tempfile
+
+    if not force:
+        cached = load_wcs(frame)
+        if cached is not None:
+            return cached
+    if not isinstance(downsample, int) or downsample < 1:
+        raise ValueError("downsample must be a positive integer")
+    exe = _solver_executable("solve-field", executable, "ASTROMETRY_SOLVE_FIELD")
+    center, radius, bounds = _solver_hints(frame, center, radius, scale, scale_err)
+    with tempfile.TemporaryDirectory(prefix="solve_field_") as td:
+        image, output, solved = (Path(td) / name for name in ("image.fits", "solution.wcs", "solution.solved"))
+        fits.PrimaryHDU(data=frame.plane(band).data.astype("float32")).writeto(image)
+        cmd = [exe, "--overwrite", "--no-plots", "--no-verify", "--dir", td,
+               "--wcs", str(output), "--solved", str(solved), "--new-fits", "none",
+               "--rdls", "none", "--match", "none", "--corr", "none",
+               "--cpulimit", str(int(np.ceil(timeout))), "--downsample", str(downsample)]
+        if config is not None:
+            cmd += ["--config", str(Path(config).expanduser().resolve())]
+        if center is not None:
+            cmd += ["--ra", str(center.ra.deg), "--dec", str(center.dec.deg), "--radius", str(radius)]
+        if bounds is not None:
+            cmd += ["--scale-units", "arcsecperpix", "--scale-low", str(bounds[0]),
+                    "--scale-high", str(bounds[1])]
+        _run_solver(cmd + [str(image)], timeout)
+        if not solved.is_file() or solved.read_bytes()[:1] != b"\x01":
+            raise RuntimeError("solve-field finished without a solved marker; check index coverage and hints")
+        return _cache_solver_output(output, frame, wcs_cache_path(frame.path))
 
 
 def solve_nova(frame, x, y, api_key=None, force=False, scale_err=10.0, timeout=300):
@@ -804,20 +930,23 @@ def _brightness(catalog):
 
 
 def solve_from_sources(frame, x, y, api_key=None, force=False, solver="nova",
-                       astap_exe=None, catalog=None):
+                       astap_exe=None, catalog=None, solver_options=None):
     """Solve using an already-measured source list where the solver can use one.
 
     ASTAP detects its own stars, so the source list is simply ignored there; this
     exists so ``Extraction.solve_wcs`` can call one function regardless of solver.
     """
+    options = dict(solver_options or {})
+    if solver == "solve-field":
+        return solve_field(frame, force=force, **options)
     if solver == "astap":
-        return solve_astap(frame, force=force, astap_exe=astap_exe)
+        return solve_astap(frame, force=force, astap_exe=astap_exe, **options)
     if solver == "nova":
-        return solve_nova(frame, x, y, api_key=api_key, force=force)
+        return solve_nova(frame, x, y, api_key=api_key, force=force, **options)
     if solver == "local":
-        return solve_local(frame, _require_catalog(catalog), x=x, y=y, force=force)
+        return solve_local(frame, _require_catalog(catalog), x=x, y=y, force=force, **options)
     raise ValueError(
-        f"unknown solver {solver!r} (expected 'astap', 'nova' or 'local')"
+        f"unknown solver {solver!r} (expected 'astap', 'solve-field', 'nova' or 'local')"
     )
 
 
@@ -832,7 +961,7 @@ def _require_catalog(catalog):
 
 
 def solve(frame, solver="astap", api_key=None, force=False, astap_exe=None,
-          thresh=2.0, catalog=None):
+          thresh=2.0, catalog=None, solver_options=None):
     """Solve (or load cached) a WCS for a frame. The general entry point.
 
     ``solver="lift"`` copies a trustworthy header solution instead of solving.
@@ -846,20 +975,23 @@ def solve(frame, solver="astap", api_key=None, force=False, astap_exe=None,
             return cached
     if solver == "lift":
         return lift(frame, force=force)
+    options = dict(solver_options or {})
+    if solver == "solve-field":
+        return solve_field(frame, force=force, **options)
     if solver == "astap":
-        return solve_astap(frame, force=force, astap_exe=astap_exe)
+        return solve_astap(frame, force=force, astap_exe=astap_exe, **options)
     if solver == "local":
         # `thresh` is not forwarded: it is the photometry's detection threshold, and the
         # solver wants a much higher one. See `detect_for_solve`.
-        return solve_local(frame, _require_catalog(catalog), force=force)
+        return solve_local(frame, _require_catalog(catalog), force=force, **options)
     if solver == "nova":
         from . import photometry
 
         return photometry.extract_sources(frame, thresh=thresh).solve_wcs(
-            api_key=api_key, force=force, solver="nova"
+            api_key=api_key, force=force, solver="nova", solver_options=options
         )
     raise ValueError(
-        f"unknown solver {solver!r} (expected 'astap', 'local', 'nova' or 'lift')"
+        f"unknown solver {solver!r} (expected 'astap', 'solve-field', 'local', 'nova' or 'lift')"
     )
 
 

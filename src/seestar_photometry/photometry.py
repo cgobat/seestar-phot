@@ -107,7 +107,8 @@ class Extraction:
     cogs: list = field(default=None, repr=False)
     frame: object = field(default=None, repr=False)
 
-    def solve_wcs(self, api_key=None, force=False, solver="nova", catalog=None):
+    def solve_wcs(self, api_key=None, force=False, solver="nova", catalog=None,
+                  solver_options=None):
         """Solve (or load cached) the frame's WCS from this source catalog.
 
         Reuses the green-band detections as the solver's source list, so no second
@@ -126,6 +127,7 @@ class Extraction:
         return astrometry.solve_from_sources(
             self.frame, np.asarray(g["x"])[order], np.asarray(g["y"])[order],
             api_key=api_key, force=force, solver=solver, catalog=catalog,
+            solver_options=solver_options,
         )
 
     def match_gaia(self, gaia, wcs=None, tol_arcsec=2.0):
