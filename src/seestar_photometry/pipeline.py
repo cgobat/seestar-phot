@@ -303,8 +303,7 @@ def build_frame_table(project, workers=None, force=False, limit=None,
     """
     project.ensure_dirs()
     catalogue_path = project.catalogue_path
-    if not catalogue_path.exists():
-        project.catalogue()  # build it once, in the parent, before forking
+    project.catalogue()  # validate/cache once in the parent, before forking
 
     existing = None
     done = set()
@@ -467,8 +466,7 @@ def build_measurements(project, workers=None, limit=None, diagnostics=False):
     """
     project.ensure_dirs()
     catalogue_path = project.catalogue_path
-    if not catalogue_path.exists():
-        project.catalogue()
+    project.catalogue()  # validate configured reference columns before forking
 
     keys = project.frames()
     if limit is not None:

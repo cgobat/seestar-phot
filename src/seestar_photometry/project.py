@@ -272,6 +272,7 @@ class Project:
                 self.target.radec, self.catalogue_radius_deg,
                 gmag_limit=self.gmag_limit, epoch=self.epoch,
             )
+            catalogs.validate_catalogue(catalogue, self.band_calibrations)
             catalogue.write(self.catalogue_path, format="ascii.ecsv", overwrite=True)
             return catalogue
 

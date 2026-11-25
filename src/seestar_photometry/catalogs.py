@@ -103,6 +103,26 @@ def propagate_epoch(catalogue, epoch, ref_epoch=2016.0):
     return out
 
 
+def validate_catalogue(catalogue, specifications):
+    """Check configured reference columns before starting a worker pool."""
+    required = {"source_id", "ra", "dec"}
+    for spec in specifications.values():
+        if spec.reference_mag is None:
+            if not {"v_jkc_mag", "v_mag"}.intersection(catalogue.colnames):
+                required.add("v_jkc_mag")
+        else:
+            required.add(spec.reference_mag)
+        columns = spec.colour_columns
+        if columns and spec.degree:
+            required.update((columns,) if isinstance(columns, str) else columns)
+    missing = required.difference(catalogue.colnames)
+    if missing:
+        raise ValueError(
+            f"catalogue lacks requested columns {sorted(missing)}; rebuild with "
+            "project.catalogue(overwrite=True), or supply an enriched field catalogue"
+        )
+
+
 def _tile_centers(center, half_size_deg, n_tiles):
     """Grid of tile centres (ra, dec) as true angular offsets around ``center``.
 
