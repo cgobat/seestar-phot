@@ -305,7 +305,7 @@ def _cache_solver_output(output, frame, cache):
     if not np.isfinite(sky).all() or not np.allclose(recovered, xy, atol=1e-3, rtol=0):
         raise RuntimeError("solver produced a non-finite or non-invertible WCS")
     result = _write_wcs(wcs.to_header(relax=True), cache)
-    frame.ccd.wcs = result
+    frame.wcs = result
     return result
 
 

@@ -37,6 +37,7 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 from astropy.io import fits
+from astropy.nddata import CCDData
 
 #: Order of the color planes along axis 0. Green (index 1) is the science band.
 BANDS = ("R", "G", "B")
@@ -108,6 +109,16 @@ class SeestarFrame:
     def shape(self):
         """Image shape ``(ny, nx)``, from the data (headers can't be trusted)."""
         return self.data.shape[1:]
+
+    def plane(self, band: str):
+        if band not in BANDS:
+            raise ValueError(f"Invalid band {band}. Should be R, G, or B.")
+        data = getattr(self, band.lower())
+        ccd = CCDData(data=data, unit="adu", header=self.header)
+        ccd.meta.pop("NAXIS3", 0)
+        ccd.meta["NAXIS"] = data.ndim
+        ccd.meta["CHANNEL"] = band
+        return ccd
 
 
 def _normalise_cube(data):
